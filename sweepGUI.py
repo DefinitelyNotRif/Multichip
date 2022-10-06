@@ -87,15 +87,6 @@ def reset_spa():
         smu.force('Voltage', 'Auto Ranging', 0)
 
 
-def set_text(e, s, val):
-    """
-    Sets the text of an Entry e with a StringVar s to val. TODO: Why didn't I just set the stv?!
-    """
-    e.delete(0, tk.END)
-    e.insert(0, val)
-    s.set(val)
-
-
 def open_trans_selection():  # Move?
     selection_window = tk.Toplevel(window)
     selection_window.geometry("240x480")
@@ -600,7 +591,8 @@ def init_sweep_tab():
                     rng = suffix(ent_stop1.get()) - suffix(ent_start1.get())  # The voltage range
                     if t == 'step':  # Update n. But since it needs to be an integer, update step too right afterwards!
                         if x == 0:  # To prevent zero division errors
-                            set_text(ent_n1, stv_n1, '1')
+                            stv_n1.set('1')
+                            # set_text(ent_n1, stv_n1, '1')
                             return
                         newn = round(rng / x + 1)
                         stv_n1.set(strf(newn))
@@ -621,7 +613,8 @@ def init_sweep_tab():
                     if t == 'step':
                         if x == 0:  # Here this special case matters: only one sweep, therefore n=1 and step is
                             # undefined (but set to 0 here - this isn't sent to the SPA anyways).
-                            set_text(ent_n2, stv_n2, '1')
+                            stv_n2.set('1')
+                            # set_text(ent_n2, stv_n2, '1')
                             return
                         newn = round(rng / x + 1)
                         stv_n2.set(strf(newn))
@@ -631,7 +624,7 @@ def init_sweep_tab():
                     if t == 'n':
                         if x == 1:
                             stv_step2.set('0')
-                            set_text(ent_step2, stv_step2, '0')
+                            # set_text(ent_step2, stv_step2, '0')
                             return
                         if x == 0:
                             return
