@@ -2487,7 +2487,7 @@ def init_import_tab():
         """
         header_stvs = [stv_imp_prim, stv_imp_sec, stv_imp_i0, stv_imp_ia, stv_imp_i1, stv_imp_i2, stv_imp_i3,
                        stv_imp_i4]  # To include them in locals()
-        values = window.clipboard_get().split()
+        values = window.clipboard_get().split('\n')[:-1]  # The last element will always be \n, so we can clip it.
         if len(values) < 3:  # TODO: Untrue
             tk.messagebox.showerror('', "Invalid data in clipboard!")
             return
