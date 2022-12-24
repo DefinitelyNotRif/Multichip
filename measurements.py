@@ -8,7 +8,7 @@ import logging
 import traceback
 
 
-def init_spa(): #TODO: Move to main file??? Does it matter?
+def init_spa():  # TODO: Move to main file??? Does it matter?
     b1500 = AgilentB1500("GPIB0::18::INSTR", read_termination='\r\n', write_termination='\r\n', timeout=60000)
     b1500.initialize_all_smus()
     b1500.data_format(21, mode=1)
@@ -16,13 +16,13 @@ def init_spa(): #TODO: Move to main file??? Does it matter?
     # raise Exception
 
 
-def sweep(b1500, params, w): #params is a nested list (NO LINLOG).
+def sweep(b1500, params, w):  # params is a nested list (NO LINLOG).
     try:
         b1500.meas_mode('STAIRCASE_SWEEP', *b1500.smu_references)
         for smu in b1500.smu_references:
             smu.enable()  # enable SMU
             smu.adc_type = 'HRADC'  # set ADC to high-resoultion ADC
-            smu.meas_range_current = '1 nA'#TODO: ??????
+            smu.meas_range_current = '1 nA'  # TODO: ??????
             smu.meas_op_mode = 'COMPLIANCE_SIDE'  # other choices: Current, Voltage, FORCE_SIDE, COMPLIANCE_AND_FORCE_SIDE
         b1500.adc_setup('HRADC', 'PLC', 3)
         b1500.sweep_timing(params[2][3], params[2][4], step_delay=params[2][4])  # hold, delay, step delay.
@@ -39,14 +39,16 @@ def sweep(b1500, params, w): #params is a nested list (NO LINLOG).
         # print("prim: " + str(names.index(params[3][params[2][-1].index(params[0][0])])) + ", \n"
         #         "sec: " + str(names.index(params[3][params[2][-1].index(params[1][0])])) + ", \n"
         #         "const: " + str(names.index(params[3][params[2][-1].index(params[2][0])])))
-        smu_ground = smus[names.index(params[3][3])]
+        n_columns = 3 if params[3][3] == "(None)" else 4  # Don't define the ground SMU, and "return" 3 columns
+        if n_columns == 4:  # If the ground SMU was defined
+            smu_ground = smus[names.index(params[3][3])]
+            smu_ground.compliance = 10e-6  # Arbitrary
+            smu_ground.force('Voltage', 'Auto Ranging', 0)
         smu_prim.compliance = params[0][5]
         smu_sec.compliance = params[1][5]
         smu_const.compliance = params[2][2]
-        smu_ground.compliance = 10e-6  # Arbitrary
-        smu_ground.force('Voltage', 'Auto Ranging', 0)
         smu_const.force('Voltage', 'Auto Ranging', params[2][1])
-        smu_prim.staircase_sweep_source('Voltage', 'LINEAR_SINGLE', 'Auto Ranging', params[0][1], params[0][2], n, params[0][5]) #jg
+        smu_prim.staircase_sweep_source('Voltage', 'LINEAR_SINGLE', 'Auto Ranging', params[0][1], params[0][2], n, params[0][5])  # jg
 
         b1500.check_errors()
         b1500.clear_buffer()
@@ -82,7 +84,7 @@ def sweep(b1500, params, w): #params is a nested list (NO LINLOG).
             data = b1500.read_data(n)
             # print(data)
             new_i = []
-            for col in range(4):
+            for col in range(n_columns):
                 new_i.append(data.iloc[:, col].values.tolist())  # new_i is now a list of 4 lists
             i.append(new_i[d_index])
             measurement_vars.send_sweep = [v1, v2, new_i]
@@ -119,13 +121,16 @@ def transient(b1500, params, w, limit_time):  # Params = [param_list, [voltages]
         smu1 = orderly_smus[names.index(params[4][0])]
         smu2 = orderly_smus[names.index(params[4][1])]
         smu3 = orderly_smus[names.index(params[4][2])]
-        smu_ground = orderly_smus[names.index(params[4][3])]
+        n_columns = 3 if params[4][3] == "(None)" else 4  # Don't define the ground SMU, and "return" 3 columns
+        if n_columns == 4:
+            smu_ground = orderly_smus[names.index(params[4][3])]
+            smu_ground.compliance = 1e-6  # Arbitrary.
+            smu_ground.force('Voltage', 'Auto Ranging', 0)
         smus = [smu1, smu2, smu3]
         for i in range(3):
             smus[i].compliance = params[2][i]
             smus[i].force('Voltage', 'Auto Ranging', params[1][i])
-        smu_ground.compliance = 1e-6  # Arbitrary.
-        smu_ground.force('Voltage', 'Auto Ranging', 0)
+
         smu_meas = smus[params[0].index(params[3][0])]
         ch_meas = names.index(params[4][params[0].index(params[3][0])]) + 1
         channels = [names.index(s) + 1 for s in params[4]]
@@ -149,9 +154,9 @@ def transient(b1500, params, w, limit_time):  # Params = [param_list, [voltages]
             for x in channels:
                 b1500.write("TTI " + str(x))  # TODO: Check if the improvement helps
             b1500.check_idle()
-            for q in range(3):
+            for q in range(n_columns - 1):
                 tempdata.append(b1500.read_data(1).iloc[0].values.flatten().tolist())
-            data.append([tempdata[0][0], tempdata[0][1], tempdata[1][1], tempdata[2][1], tempdata[3][1]])
+            data.append([tempdata[0][0], *[tempdata[j][1] for j in range(n_columns)]])
             measurement_vars.send_transient = [list(x) for x in zip(*list(data))]
             w.event_generate("<<add-spot>>", when="tail")
             if limit_time:
@@ -171,7 +176,7 @@ def transient(b1500, params, w, limit_time):  # Params = [param_list, [voltages]
         # for row in data:
         #     t = row[0]
         #     row[0] = t.seconds + t.microseconds/1e6
-        measurement_vars.ex_vars = data  # List of lists of length 5 - no need to transpose later!
+        measurement_vars.ex_vars = data  # List of lists of length 5 (or 4) - no need to transpose later!
         measurement_vars.ex_finished = True
     except Exception as e:
         tb = traceback.format_exc()
