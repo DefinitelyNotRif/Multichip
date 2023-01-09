@@ -23,6 +23,7 @@ from measurements import *
 import measurement_vars
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from Arduino import Arduino
 
 
 def do_nothing():
@@ -59,6 +60,8 @@ drain_smus = []  # Lists the SMUs connected to the drains (e.g. ["SMU2", ...]).
 trans_list = []  # A list of tuples, where the first element is the transistor's position, and the second is the SMU
 # that will measure it. e.g. ('s5d7', 'SMU2'), or ('s7d7', '(None)').
 selected_bd = ''  # The selected bonding diagram.
+active_trans = [[False for i in range(4)] for j in range(4)]  # True if the transistor is selected.
+pinno = {}  # The dictionary that maps each Arduino digital output to an index in the range 0-15.
 global meas_type    # 'char'/'exposure'/'transient'. Determines the type of the last measurement, for the "Use data from
 meas_type = ''      # last exp." option.
 vth_funcs = ['Constant', 'Linear extrapolation']
@@ -107,17 +110,20 @@ def open_trans_selection():
         Clears frm_trans, then rebuilds it with the positions of the new BD's transistors.
         """
         global drain_smus
-        nonlocal stvs_trans_smus, drps_trans_smus
-        for w in frm_trans.winfo_children():  # Destroy all widgets in the frame
+        nonlocal stvs_trans_smus, drps_trans_smus, btns_select
+        for w in frm_bd.winfo_children():  # Destroy all widgets in the frame
             w.destroy()
         row = trans_names[bd_list.index(stv_bd.get())]  # Gets the row that corresponds to the selected BD
         stvs_trans_smus = []
         drps_trans_smus = []
         for i in range(len(row)):  # For each transistor, create a label with its name, and a dropmenu with the SMUs.
-            ttk.Label(frm_trans, text=row[i]).grid(row=i, column=0, sticky="nse", padx=5, pady=5)
+            ttk.Label(frm_bd, text=row[i]).grid(row=i, column=0, sticky="nse", padx=5, pady=5)
             stvs_trans_smus.append(tk.StringVar(value="(None)"))
-            drps_trans_smus.append(ttk.OptionMenu(frm_trans, stvs_trans_smus[-1], "(None)", "(None)", *drain_smus))
+            drps_trans_smus.append(ttk.OptionMenu(frm_bd, stvs_trans_smus[-1], "(None)", "(None)", *drain_smus))
             drps_trans_smus[-1].grid(row=i, column=1, sticky="nsew", padx=10, pady=5)
+            if len(btns_select) > 0:  # To avoid running this before the buttons have been initialized
+                for j in range(4):
+                    btns_select[j][i]["text"] = row[i]
 
     def confirm_trans():
         """
@@ -133,7 +139,17 @@ def open_trans_selection():
         selection_window.grab_release()
         selection_window.destroy()
 
-    global trans_list, selected_bd
+    def activate_trans(row, col):
+        global active_trans
+        nonlocal btns_select
+        if active_trans[row][col]:
+            btns_select[row][col].config(bg='red')
+            active_trans[row][col] = False
+        else:
+            btns_select[row][col].config(bg='green')
+            active_trans[row][col] = True
+
+    global trans_list, selected_bd, active_trans
     bd_list = []  # The names of the bonding diagrams
     trans_names = []  # Each row holds the transistor positions (e.g. "s5d7") for its respective BD
     stvs_trans_smus = []  # The StringVars that correspond to the SMU that will measure each transistor. Dynamic!
@@ -144,9 +160,15 @@ def open_trans_selection():
     for row in raw_bd:
         bd_list.append(row[0])  # Append the name
         trans_names.append([x for x in row[1:] if not numeric(x)])  # Append all non-numeric values, i.e. the positions
+        # In the end, bd_list is a list of the names (e.g. ["A", "B",...]) and trans_names is a nested list
+        # of the positions (e.g. [['s5d5', 's5d7', ...],[...],...]).
+
+    global board
+    if not board:
+        messagebox.showerror('', 'Please connect the Arduino controller and reopen the program. \nTraceback: ' + tb)
 
     selection_window = tk.Toplevel(window)
-    selection_window.geometry("250x300")
+    selection_window.geometry("500x400")
     selection_window.title("Select Transistors")
     selection_window.grab_set()  # Always on top
     selection_window.rowconfigure(0, weight=1)
@@ -155,15 +177,34 @@ def open_trans_selection():
     frm_selection.grid(row=0, column=0, sticky="nsew")
     frm_selection.rowconfigure(1, weight=1)
     frm_selection.columnconfigure([0, 1], weight=1)
+    frm_selection.columnconfigure(2, weight=2)
+
+    btns_select = []  # The 4x4 grid of buttons
+    ttk.Label(frm_selection, text="Active transistors: ").grid(row=0, column=2, sticky="nsw")
+    frm_transgrid = ttk.Frame(frm_selection, relief=tk.SUNKEN)
+    frm_transgrid.grid(row=1, column=2, sticky="nsew", padx=10, pady=10)
+    frm_transgrid.rowconfigure([1, 3, 5, 7], weight=1)
+    frm_transgrid.columnconfigure([0, 1, 2, 3], weight=1)
+    for i in range(4):
+        ttk.Label(frm_transgrid, text=f"Board no. {i + 1}: ").grid(row=2 * i, column=0, columnspan=4, padx=5,
+                                                                   sticky="nsw")
+        btns_select.append([])
+        for j in range(4):
+            btns_select[-1].append(tk.Button(frm_transgrid, text='', bg='red'))
+            btns_select[-1][-1].grid(row=2 * i + 1, column=j, sticky="nsew", padx=5)
+            btns_select[-1][-1].config(command=lambda xi=i, xj=j: activate_trans(xi, xj))
+            if active_trans[i][j]:
+                btns_select[-1][-1].config(bg='green')
+
     ttk.Label(frm_selection, text="Bonding diagram: ").grid(row=0, column=0, sticky="nsw")
     stv_bd = tk.StringVar()
     stv_bd.set(bd_list[0])
     stv_bd.trace("w", lambda *args: update_trans_frame())
     drp_bd = ttk.OptionMenu(frm_selection, stv_bd, None, *bd_list)
     drp_bd.grid(row=0, column=1, sticky="nsew", padx=10, pady=5)
-    frm_trans = ttk.Frame(frm_selection, relief=tk.SUNKEN)
-    frm_trans.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
-    frm_trans.columnconfigure(1, weight=1)
+    frm_bd = ttk.Frame(frm_selection, relief=tk.SUNKEN)
+    frm_bd.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+    frm_bd.columnconfigure(1, weight=1)
     # scrollbar_trans = ttk.Scrollbar(cnv_trans, orient="vertical", command=cnv_trans.yview)
     # scrollbar_trans.grid(row=0, column=1, sticky="ns")
     # cnv_trans["yscrollcommand"] = scrollbar_trans.set
@@ -373,7 +414,7 @@ def hacky_no_spa_1(w):
 
 
 def hacky_no_spa_2():
-    # messagebox.showerror('SPA not connected', err_msg)
+    messagebox.showerror('SPA not connected', err_msg)
     pass
 
 
@@ -593,10 +634,10 @@ def init_channels_tab():
     #     stv_smu4.set(smu_list[3])
     #     drp_smu4.configure(state="normal")
     # Temporarily:
-    stv_smu1.set("SMU2")
-    stv_smu2.set("SMU3")
-    stv_smu3.set("SMU4")
-    stv_smu4.set("SMU1")
+    stv_smu1.set("SMU1")
+    stv_smu2.set("SMU5")
+    stv_smu3.set("SMU6")
+    stv_smu4.set("SMU4")
     ttk.Label(tab_channels, text="Variable name: ").grid(row=0, column=2, sticky="nse")
     ttk.Label(tab_channels, text="Variable name: ").grid(row=1, column=2, sticky="nse")
     ttk.Label(tab_channels, text="Variable name: ").grid(row=2, column=2, sticky="nse")
@@ -1385,7 +1426,7 @@ def init_sweep_tab():
                         measurement_vars.send_transient = []
                         measurement_vars.ex_finished = False
 
-                        global b1500
+                        global b1500, stv_s_timegroup
                         # Start the appropriate measurement
                         if inv_ex_type.get() == 0:
                             if inv_ex_limit.get() == 1:
@@ -1394,7 +1435,7 @@ def init_sweep_tab():
                                 limit_time = False
                             th2 = threading.Thread(target=transient,
                                                    args=(b1500, [param_list, p_voltages, p_comps, p_time_params, p_smus],
-                                                         window_load, limit_time), daemon=True)
+                                                         window_load, limit_time, int(stv_s_timegroup.get())), daemon=True)
                         else:
                             th2 = threading.Thread(target=transient_sweep, args=(b1500, [p_prim, [stv_name2.get(), suffix(stv_ex_sweepvar.get()), suffix(stv_ex_s_comp.get()), suffix(stv_ex_s_n.get()), suffix(stv_ex_s_between.get())], p_other, p_smus],window_load), daemon=True)
                         btn_ex_end["state"] = tk.DISABLED  # Disable the finish button!
@@ -1585,10 +1626,11 @@ def init_sweep_tab():
             measurement_vars.send_sweep = []
             measurement_vars.send_transient = []
 
+            global stv_s_timegroup
             # Determine which entryboxes are required and check that they're all filled in
             if inv_ex_type.get() == 0:  # Transient
                 check_params = [s.get() for s in [stv_ex_i0, stv_ex_ia, *stvs_ex_tvars, *stvs_ex_tcomps,
-                                                  stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold]]
+                                                  stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold, stv_s_timegroup]]
                 check_numeric = 2  # The first index from which the values must be numeric. TODO: If I decide not to...
                 # TODO: ...use stv_ex_sample, I can get rid of check_numeric altogether.
             else:  # Periodic sweep
@@ -1757,7 +1799,7 @@ def init_sweep_tab():
         ents_ex_tcomps = []
         # stv_ex_sample = tk.StringVar()
 
-        ttk.Label(frm_ex_transient, text="Sampling parameter: ").grid(row=1, column=0, columnspan=2, sticky="nse")
+        # ttk.Label(frm_ex_transient, text="Sampling parameter: ").grid(row=1, column=0, columnspan=2, sticky="nse")
         # drp_ex_t_sampling = ttk.OptionMenu(frm_ex_transient, stv_ex_sample, None, *param_list)
         # drp_ex_t_sampling.grid(row=1, column=2, columnspan=3, padx=5, sticky="nsew")
         for i in range(3):
@@ -2162,12 +2204,16 @@ def init_time_tab():
             :param: y1-y4: The four currents. y1 is the drain current, y2 and y3 are the gate currents, and y4 is the
             source current.
             """
-            x, y1, y2, y3, y4 = tuple(measurement_vars.send_transient)
+            data = measurement_vars.send_transient
+            x = data[0]
+            y1s = data[1:-3]
+            y2, y3, y4 = tuple(data[-3:])  # TODO: What if there's no source SMU?!?!?!?!
             ax.clear()
             ax2.clear()
             ax3.clear()
             ax4.clear()
-            ax.plot(x, y1, 'b')
+            for y in y1s:
+                ax.plot(x, y, 'b')  # TODO: Slightly different colors?
             ax2.plot(x, y2, 'g')
             ax3.plot(x, y3, 'r')
             ax4.plot(x, y4, 'c')
@@ -2222,9 +2268,10 @@ def init_time_tab():
             names = ['t', 'I (' + stv_name.get() + ')', 'I (' + right_params[0] + ')', 'I (' + right_params[1] + ')',
                      'I (Source)']
             if len(measurement_vars.ex_vars) != 0:  # To avoid unpacking an empty list after aborting
-                data_to_save = measurement_vars.ex_vars  # Rows of length 5
-                data_to_analyze = [list(x) for x in zip(*data_to_save)]  # 5 columns
-                data_to_save = [names, *data_to_save]
+                data_to_save = measurement_vars.ex_vars  # Rows of length (num_drains+4)
+                data_to_analyze = [list(x) for x in zip(*data_to_save)]  # (num_drains+4) columns
+                data_to_analyze = [data_to_analyze[0], *data_to_analyze[-4:]]  # 5 columns (uses the LAST drain)
+                # data_to_save = [names, *data_to_save]
                 meas_order = 'T' + extract_var_letter(stv_name.get())
                 set_labels(meas_order)
                 meas_prim = data_to_analyze[0]
@@ -2238,8 +2285,17 @@ def init_time_tab():
                     ids = [int(row[0]) for row in list(csv_reader)[1:]]
                 if len(ids) != 0:
                     index = max(ids) + 1
-                params_to_file = [index, *info, meas_order, '']
-                add_experiment(*params_to_file, data_to_save)
+                # params_to_file = [index, *info, meas_order, '']
+                # add_experiment(*params_to_file, data_to_save)
+
+                for i in range(1, len(data_to_save[0])-3):  # Save each of the experiments separately
+                    sliced = [[row[0], row[i], *row[-3:]] for row in data_to_save]
+                    sliced = [names, *sliced]
+                    params_to_file = [index, *info, meas_order, '']  # TODO: Trans no.!!
+                    params_to_file[8] = f'temp_{i}'
+                    add_experiment(*params_to_file, sliced)
+                    index += 1
+
 
         def linlog():
             """
@@ -2277,13 +2333,14 @@ def init_time_tab():
                 ax4.set_visible(False)
             bar.draw()
 
+        global stv_s_timegroup, drain_smus, active_trans, board, pinno
         measurement_vars.incr_vars = []     # Reset the variables that are used to communicate between measurements.py
         measurement_vars.ex_vars = []       # and this file
         measurement_vars.send_transient = []
         # Check that all the required entryboxes are filled in
         check_info = [stv_op.get(), stv_gas.get(), stv_conc.get(), stv_carr.get(), stv_atm.get(),
                         stv_dev.get(), stv_dec.get(), stv_thick.get(), stv_temp.get(), stv_hum.get()]
-        check_params = [s.get() for s in [*stvs[0], *stvs[1], stvs[2], *stvs[3]]]
+        check_params = [s.get() for s in [*stvs[0], *stvs[1], stvs[2], *stvs[3], stv_s_timegroup]]
         for i in [*check_info, *check_params]:
             if i == '':
                 messagebox.showerror('', "Please fill out all the parameters!")
@@ -2301,23 +2358,27 @@ def init_time_tab():
                 suffix(i)
             except ValueError:
                 messagebox.showerror('', "The following parameters must be numeric: Voltages, Compliances, "
-                                         "Increment, No. of steps, Total measuring time, Hold time. ")
+                                         "Increment, No. of steps, Total measuring time, Hold time, and No. of "
+                                         "measurements per update. ")
                 return
-            try:  # Make sure the SMUs are properly detected. TODO: Delete?
-                smu_name_list = [stv_smu1.get(), stv_smu2.get(), stv_smu3.get(), stv_smu4.get()]
-                if len(smu_name_list) > len(set(smu_name_list)):  # This means the SMUs aren't unique (at least one is
-                    # selected twice!)
-                    messagebox.showerror('', "Please make sure all the SMUs (in the 'Channels' tab) are different!")
-                    return
-            except Exception as e:
-                messagebox.showerror('', "Something's wrong with the SMUs (\"" + e + "\").")
-                tb = traceback.format_exc()
-                logging.error(str(e) + ". Traceback: " + str(tb))
+        if not any([any(x) for x in active_trans]):
+            messagebox.showerror('', "Please select at least one SMU.")
+            return
+        try:  # Make sure the SMUs are properly detected. TODO: Delete?
+            smu_name_list = [*[x for x in drain_smus], stv_smu2.get(), stv_smu3.get(), stv_smu4.get()]
+            if len(smu_name_list) > len(set(smu_name_list)):  # This means the SMUs aren't unique (at least one is
+                # selected twice!)
+                messagebox.showerror('', "Please make sure all the SMUs (in the 'Channels' tab) are different!")
+                return
+        except Exception as e:
+            messagebox.showerror('', "Something's wrong with the SMUs (\"" + e + "\").")
+            tb = traceback.format_exc()
+            logging.error(str(e) + ". Traceback: " + str(tb))
 
         p_voltages = [suffix(s.get()) for s in stvs[0]]  # The voltage of each SMU
         p_comps = [suffix(s.get()) for s in stvs[1]]  # The compliance of each SMU
         p_time_params = [stvs[2].get(), *[suffix(s.get()) for s in stvs[3]], stvs[4]]  # [name, int, n, tot, hold, linlog]
-        p_smus = [stv_smu1.get(), stv_smu2.get(), stv_smu3.get(), stv_smu4.get()]
+        p_smus = [drain_smus, stv_smu2.get(), stv_smu3.get(), stv_smu4.get()]  # The names of the SMUs (as strings)
         right_params = [x for x in param_list if not x == stv_name.get()]  # The two currents that aren't the main
         # variable - to display on the right side along I(s).
 
@@ -2347,8 +2408,9 @@ def init_time_tab():
         else:
             limit_time = False
         # Start the measurement in a thread, so the window can update in real time
-        th = threading.Thread(target=transient, args=(b1500, [param_list, p_voltages, p_comps, p_time_params, p_smus],
-                                                  window_load, limit_time), daemon=True)
+        th = threading.Thread(target=transient, args=(b1500, [param_list, p_voltages, p_comps, p_time_params, p_smus,
+                                                              active_trans], window_load, limit_time,
+                                                      int(stv_s_timegroup.get()), board, pinno), daemon=True)
         th.start()
 
     def save_t_config(edit=False):
@@ -2604,6 +2666,7 @@ def init_time_tab():
     # stv_tot.trace("w", lambda name, index, mode, var=stv_int: update_time_params('tot'))
     global drp_name
     drp_name = ttk.OptionMenu(frm_params, stv_name, stv_name.get(), *param_list)
+    drp_name["state"] = tk.DISABLED
     drp_name.grid(row=0, column=1, sticky="ew")
     drp_linlog = ttk.OptionMenu(frm_params, stv_linlog, stv_linlog.get(), "Linear", "Logarithmic")
     drp_linlog.grid(row=1, column=1, sticky="ew")
@@ -3570,36 +3633,63 @@ def init_settings_tab():
         else:
             ent_s_const["state"] = tk.DISABLED
 
+    def save_preferences():
+        new_prefs = [s.get() for s in [stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion]]
+        with open('data/preferences.csv', 'w', newline='') as f:
+            csv_writer = writer(f)
+            csv_writer.writerows([[row] for row in new_prefs])  # TODO: Edge cases; Confirmation; Check empties.
+        messagebox.showinfo('', 'Preferences saved.')
+
     # TODO: Row config
     tab_settings.columnconfigure([1, 4], weight=1)
-    global stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion
+    global stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion, stv_s_timegroup
+
+    stv_s_timegroup = tk.StringVar(value='1')
+    ttk.Label(tab_settings, text="Update the transient display after every ").grid(row=0, column=0, sticky='ew')
+    ent_timegroup = ttk.Entry(tab_settings, text='1', textvariable=stv_s_timegroup, width=7)
+    ent_timegroup.grid(row=0, column=1, sticky='nsw', padx=5, pady=5)
+    ttk.Label(tab_settings, text=" measurements (reduces unnecessary delay between measurements)")\
+        .grid(row=0, column=2, columnspan=3, sticky="w")
+
     stv_s_vth = tk.StringVar(value='Constant')  # The threshold voltage extraction method. Global so it could be
-    # 'remembered'. TODO: Make a preferences file?
+    # 'remembered'.
     stv_s_const = tk.StringVar(value='1n')  # The constant threshold, for the relevant option.
-    ttk.Label(tab_settings, text="Threshold voltage extraction method: ").grid(row=0, column=0, sticky="w", padx=5,
+    ttk.Label(tab_settings, text="Threshold voltage extraction method: ").grid(row=1, column=0, sticky="w", padx=5,
                                                                                pady=5)
     global vth_funcs
     drp_s_vth = ttk.OptionMenu(tab_settings, stv_s_vth, stv_s_vth.get(), *vth_funcs)
-    drp_s_vth.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-    ttk.Label(tab_settings, text="Constant threshold: ").grid(row=0, column=2, sticky="ew", padx=5, pady=5)
+    drp_s_vth.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
+    ttk.Label(tab_settings, text="Constant threshold: ").grid(row=1, column=2, sticky="ew", padx=5, pady=5)
     ent_s_const = ttk.Entry(tab_settings, text='1n', textvariable=stv_s_const, width=7)
-    ent_s_const.grid(row=0, column=3, sticky="nsw", padx=5, pady=5)
-    ttk.Label(tab_settings, text="A").grid(row=0, column=4, sticky="w")
+    ent_s_const.grid(row=1, column=3, sticky="nsw", padx=5, pady=5)
+    ttk.Label(tab_settings, text="A").grid(row=1, column=4, sticky="w")
     stv_s_vth.trace("w", lambda *args: enable_settings_const())
+
     ttk.Label(tab_settings, text="Subthreshold region definition: top ")\
-        .grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        .grid(row=2, column=0, sticky="ew", padx=5, pady=5)
     stv_s_sts = tk.StringVar(value='30')
     ent_s_sts = ttk.Entry(tab_settings, textvariable=stv_s_sts, width=7)
-    ent_s_sts.grid(row=1, column=1, sticky="nsw", padx=5, pady=5)
+    ent_s_sts.grid(row=2, column=1, sticky="nsw", padx=5, pady=5)
     ttk.Label(tab_settings, text="% of the second derivative")\
-        .grid(row=1, column=2, columnspan=3, sticky="w", padx=5, pady=5)
+        .grid(row=2, column=2, columnspan=3, sticky="w", padx=5, pady=5)
+
     ttk.Label(tab_settings, text="On-current definition: greater than ")\
-        .grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        .grid(row=3, column=0, sticky="ew", padx=5, pady=5)
     stv_s_ion = tk.StringVar(value='10n')
     ent_s_ion = ttk.Entry(tab_settings, textvariable=stv_s_ion, width=7)
-    ent_s_ion.grid(row=2, column=1, sticky="nsw", padx=5, pady=5)
+    ent_s_ion.grid(row=3, column=1, sticky="nsw", padx=5, pady=5)
     ttk.Label(tab_settings, text="A (for sweep analysis only)")\
-        .grid(row=2, column=2, columnspan=3, sticky="w", padx=5, pady=5)
+        .grid(row=3, column=2, columnspan=3, sticky="w", padx=5, pady=5)
+
+    btn_save_prefs = ttk.Button(tab_settings, text="Save preferences", command=lambda: save_preferences())
+    btn_save_prefs.grid(row=4, column=0, columnspan=5, sticky="nsw", padx=20, pady=5, ipadx=10)
+
+    # Load preferences
+    with open('data/preferences.csv', 'r', newline='') as f:
+        csv_reader = reader(f)
+        preferences = list(csv_reader)
+    for s, p in zip([stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion], preferences):
+        s.set(p[0])
 
 
 try:
@@ -3672,6 +3762,20 @@ try:
             th.start()
             window.title("(SPA Not Connected) Simulchip v" + version)
             spa_connected = False
+    # Connect to the Arduino
+    global board
+    try:
+        board = Arduino()
+    except Exception as e:
+        # tb = str(traceback.format_exc())
+        messagebox.showerror('', 'Please connect the Arduino controller and reopen the program.')  # \nTraceback: ' + tb)
+    # Set up the Arduino pin mapping
+    # Pins: 2-12, A0-A4
+    pinno = {}
+    for i in range(11):  # Set pinno[0] to pinno[10] to 2-12
+        pinno[i] = i + 2
+    for i in range(5):  # Set pinno[11] to pinno[15] to 18-22
+        pinno[i + 11] = i + 18
 except Exception as e:
     logging.error("FIRST BLOCK error: \"" + type(e).__name__ + ": " + str(e) + "\"")
 

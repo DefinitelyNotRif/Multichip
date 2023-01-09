@@ -6,10 +6,11 @@ from datetime import datetime
 import measurement_vars
 import logging
 import traceback
+from Arduino import Arduino
 
 
-def init_spa():  # TODO: Move to main file??? Does it matter?
-    b1500 = AgilentB1500("GPIB0::18::INSTR", read_termination='\r\n', write_termination='\r\n', timeout=60000)
+def init_spa():
+    b1500 = AgilentB1500("GPIB0::17::INSTR", read_termination='\r\n', write_termination='\r\n', timeout=60000)
     b1500.initialize_all_smus()
     b1500.data_format(21, mode=1)
     return b1500
@@ -106,7 +107,8 @@ def sweep(b1500, params, w):  # params is a nested list (NO LINLOG).
         logging.error("Measurement error: " + str(e) + ". Traceback: " + str(tb))
 
 
-def transient(b1500, params, w, limit_time):  # Params = [param_list, [voltages], [comps], [varname, int, n, tot, hold, linlog], [SMU names]]
+def transient(b1500, params, w, limit_time, groupsize, board, pinno):
+    # Params = [param_list, [voltages], [comps], [varname, int, n, tot, hold, linlog], [SMU names], active_trans]
     try:
         for smu in b1500.smu_references:
             smu.enable()  # enable SMU
@@ -116,49 +118,104 @@ def transient(b1500, params, w, limit_time):  # Params = [param_list, [voltages]
         b1500.adc_setup('HRADC', 'PLC', 3)
         # b1500.adc_setup('HRADC', 'AUTO', 6)
 
+        # OLD SMU setting code:
+
+        # orderly_smus = list(b1500.smu_references)  # [smu1, smu2, smu3, smu4]
+        # names = list(b1500.smu_names.values())  # ['SMU1', ...]
+        # smu1 = orderly_smus[names.index(params[4][0])]
+        # smu2 = orderly_smus[names.index(params[4][1])]
+        # smu3 = orderly_smus[names.index(params[4][2])]
+        # n_columns = 3 if params[4][3] == "(None)" else 4  # Don't define the ground SMU, and "return" 3 columns
+        # if n_columns == 4:
+        #     smu_ground = orderly_smus[names.index(params[4][3])]
+        #     smu_ground.compliance = 1e-6  # Arbitrary.
+        #     smu_ground.force('Voltage', 'Auto Ranging', 0)
+        # smus = [smu1, smu2, smu3]
+        # for i in range(3):
+        #     smus[i].compliance = params[2][i]
+        #     smus[i].force('Voltage', 'Auto Ranging', params[1][i])
+        #
+        # smu_meas = smus[params[0].index(params[3][0])]
+        # ch_meas = names.index(params[4][params[0].index(params[3][0])]) + 1
+        # channels = [names.index(s) + 1 for s in params[4]]
+        # channels.remove(ch_meas)
+        # print("ch_meas = " + str(ch_meas) + ", channels = " + str(channels))
+
+        # New code:
+
         orderly_smus = list(b1500.smu_references)  # [smu1, smu2, smu3, smu4]
         names = list(b1500.smu_names.values())  # ['SMU1', ...]
-        smu1 = orderly_smus[names.index(params[4][0])]
-        smu2 = orderly_smus[names.index(params[4][1])]
-        smu3 = orderly_smus[names.index(params[4][2])]
-        n_columns = 3 if params[4][3] == "(None)" else 4  # Don't define the ground SMU, and "return" 3 columns
-        if n_columns == 4:
+        # print("SMUS to set the compliance of: {}".format([*params[4][0], *params[4][1:]]))  # Just in case
+        n_columns = 3 if params[4][3] == "(None)" else 4  # Don't define the ground SMU, and "return" 3 columns. TODO: Rework.
+        if n_columns == 4:  # Set the ground to 0 and define its compliance
             smu_ground = orderly_smus[names.index(params[4][3])]
             smu_ground.compliance = 1e-6  # Arbitrary.
             smu_ground.force('Voltage', 'Auto Ranging', 0)
-        smus = [smu1, smu2, smu3]
-        for i in range(3):
-            smus[i].compliance = params[2][i]
-            smus[i].force('Voltage', 'Auto Ranging', params[1][i])
+        smu2 = orderly_smus[names.index(params[4][1])]  # Secondary variables
+        smu3 = orderly_smus[names.index(params[4][2])]
+        for s in params[4][0]:  # This should be a list of all the drain SMUs
+            orderly_smus[names.index(s)].compliance = params[2][0]
+            orderly_smus[names.index(s)].force('Voltage', 'Auto Ranging', params[1][0])
+        smu2.compliance = params[2][1]
+        smu2.force('Voltage', 'Auto Ranging', params[1][1])
+        smu3.compliance = params[2][2]
+        smu3.force('Voltage', 'Auto Ranging', params[1][2])
 
-        smu_meas = smus[params[0].index(params[3][0])]
-        ch_meas = names.index(params[4][params[0].index(params[3][0])]) + 1
-        channels = [names.index(s) + 1 for s in params[4]]
-        channels.remove(ch_meas)
-        print("ch_meas = " + str(ch_meas) + ", channels = " + str(channels))
+        # board = Arduino()
+        for i in range(16):
+            board.pinMode(pinno[i], "OUTPUT")
+            board.digitalWrite(pinno[i], "LOW")
+        num_active = len([x for row in params[5] for x in row if x])  # The number of active drains
+        row_active = [any(row) for row in params[5]]  # True if the corresponding row has at least one active transistor
+        fractional_int = params[3][1]/len([x for x in row_active if x])  # TODO: Round?!
+        print(f"{num_active} active drains; {row_active} active rows; Wait {fractional_int} between each measurement.")
+
         time.sleep(params[3][4])
         b1500.check_errors()
         b1500.clear_buffer()
         b1500.clear_timer()
-        data = []
+        data = []  # The data that will be sent for displaying and saving
+        # debug vars
+        times_waited = 0
         for i in range(int(params[3][2])):
-            tempdata = []
-            b1500.write("TTI " + str(ch_meas))
-            b1500.check_idle()
+            tempdata = []  # The row to be appended to data after each "round"
+            for row in range(4):
+                if row_active[row]:  # Only measure the row if at least one transistor in it is selected
+                    for col in range(4):
+                        if params[5][row][col]:  # If this transistor should be measured (active)
+                            board.digitalWrite(pinno[4*row+col], "HIGH")
+                    time.sleep(fractional_int)  # Wait (also to make sure the relays have had the time to connect)
+                    times_waited += 1
+                    # for s in params[4][0]:  # Get drains
+                    #     b1500.write("TTI " + s[-1])
+                    for col in range(4):  # Get drains
+                        if params[5][row][col]:
+                            b1500.write("TTI " + params[4][0][col][-1])
+                    b1500.check_idle()
+                    # Turn off these 4
+                    for col in range(4):
+                        board.digitalWrite(pinno[4*row+col], "LOW")
+            #  The stored data may now have up to 17 columns (t + 16 devices)
             if measurement_vars.stop_ex:
                 print("stop_ex detected as True (before)")
                 measurement_vars.stop_ex = False
                 w.event_generate("<<close-window>>", when="tail")
                 return
-            tempdata.append(b1500.read_data(1).iloc[0].values.flatten().tolist())
-            for x in channels:
-                b1500.write("TTI " + str(x))  # TODO: Check if the improvement helps
-            b1500.check_idle()
-            for q in range(n_columns - 1):
+            for j in range(num_active):  # Add the drain measurements to the new line of data
                 tempdata.append(b1500.read_data(1).iloc[0].values.flatten().tolist())
-            data.append([tempdata[0][0], *[tempdata[j][1] for j in range(n_columns)]])
-            measurement_vars.send_transient = [list(x) for x in zip(*list(data))]
-            w.event_generate("<<add-spot>>", when="tail")
+            # Secondary variables
+            b1500.write("TTI " + params[4][1][-1])  # Get secondary 1 (e.g. JG)
+            b1500.write("TTI " + params[4][2][-1])  # Get secondary 2 (e.g. BG)
+            if n_columns == 4:
+                b1500.write("TTI " + params[4][3][-1])  # Get source
+            b1500.check_idle()
+            for q in range(n_columns - 1):  # Add these measurements to the new line of data
+                tempdata.append(b1500.read_data(1).iloc[0].values.flatten().tolist())
+            print([tempdata[0][0], *[t[1] for t in tempdata]])
+            data.append([tempdata[0][0], *[t[1] for t in tempdata]])  # TODO: Does this work?
+            if i % groupsize == 0:
+                measurement_vars.send_transient = [list(x) for x in zip(*list(data))]  # TODO: Check if correct!!!
+                w.event_generate("<<add-spot>>", when="tail")
             if limit_time:
                 measurement_vars.incr_vars = min(1, tempdata[0][0]/params[3][3])  # Time elapsed as part of the total time
             else:
@@ -172,12 +229,18 @@ def transient(b1500, params, w, limit_time):  # Params = [param_list, [voltages]
             if limit_time and tempdata[0][0] > params[3][3]:
                 break
             measurement_vars.ex_vars = data  # For abortion purposes
-            time.sleep(params[3][1])
+
         # for row in data:
         #     t = row[0]
         #     row[0] = t.seconds + t.microseconds/1e6
         measurement_vars.ex_vars = data  # List of lists of length 5 (or 4) - no need to transpose later!
         measurement_vars.ex_finished = True
+
+        # Bandaid solution to the mistiming:
+        measurement_vars.incr_vars = 1
+        w.event_generate("<<prb-increment>>", when="tail")
+        print(times_waited)
+
     except Exception as e:
         tb = traceback.format_exc()
         logging.error("Measurement error: " + str(e) + ". Traceback: " + str(tb))
