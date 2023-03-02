@@ -1,0 +1,82 @@
+v0.4.1
+General: 
+- Error suppression is handled by a single variable (for debugging purposes). 
+Sweep & Transient tabs: 
+- The transistor selection window now matches the board layout. The device and transistor names can now be set manually, and these names will be used in the experiment info (for transient and characteristic experiments). 
+- The SMU choices and board layouts are now saved in data\transistor_data.csv. When the SMUs are changed, the transistors all deactivate automatically. 
+Experiments: 
+- The source SMU now functions properly when set to "(None)". 
+- The drains are now displayed in (slightly) different colors. 
+- UNTESTED: Added simultaneous characteristic measurement. 
+
+
+v0.4.0  [REVISE stuff about the time_groupsize?]
+Sweep & Transient tabs: 
+- The layout of the transistor selection window does not match the board layout - it will be changed shortly. 
+Experiments: 
+- The graph of the transient experiments can be updated after every X measurements, rather than after each measurement. 
+- Added the option to simultaneously measure multiple devices. Currently only for transient measurements, and the transistor names are still placeholders. 
+Settings: 
+- Added the option to set how many measurements the transient experiment takes between each graph update. 
+
+v0.3.0
+General: 
+- Implemented the transistor selection window. After choosing a bonding diagram (saved in "bonding_diagrams.csv"), it lists the transistors associated with the BD, and lets the user choose which SMU to assign to each (if at all). 
+Channels tab: 
+- The drain SMUs are now automatically set as all the SMUs that haven't been assigned to a gate or the source. (As such, the user cannot directly change them)
+Sweep tab: 
+- Exposure experiments: Removed the option to choose the main current in the transient measurement. It is now always set to the drain current (and its first SMU, for now). 
+Transient tab: 
+- Changing the total time while "No. of measurements" is set to 1 no longer crashes the program (because of the division by zero)
+- Added the option to save, load, edit and delete configurations for the Transient tab. These configurations are saved in "configs_t.csv", while the Sweep tab configuration file has been renamed to "configs_s.csv". 
+- Added the transistor selection button to this tab as well. 
+Analysis tab: 
+- Now shows the toolbar below the graphs, allowing the user to save them.
+Settings tab: 
+- New tab, with the options to: 
+- Set the threshold voltage extraction method (constant current, linear extrapolation)
+- Set the definition of the ST region
+- Set the definition of the on-current
+
+- MAYBE SOMETHING I'VE MISSED?!?!
+
+
+v0.2.1
+Experiments: 
+- Changed the "Logarithmic scale" label. 
+- Errors that originate from the measurement functions will now appear in the logs file. 
+- You can now import experiments with less than 10 measurements. 
+
+
+v0.2.0
+Channels tab: 
+- The first SMU in the list is now defined as the drain SMU, and will always be the one that measures the main current (the one that will be saved in sweep measurements). 
+Sweep tab: 
+- Added the "Remove configuration" button. 
+- Added confirmation messages when saving, editing or deleting configurations. 
+- Added a PermissionError handler (for attempts to edit/delete a configuration with the file open). 
+- Exposure experiment: Added the option to choose the main current in the transient measurement. 
+- The "additional currents" option now shows all three additional currents during the transient phase of an exposure experiment. 
+- The information frame now defines the units of the "Concentration", "Dec. thickness", "Temperature" and "Humidity" fields. 
+- Fixed floating point errors that may arise while setting the "Step" or "No. of steps" parameters. 
+Transient tab: 
+- The labels of the variable names now change when the user changes the names. 
+- Changed the widths of the frames to make the text less likely to get cut off. 
+Import tab: 
+- Added a separate sub-tab for the importation of transient measurements. 
+- If the pasted data has a header, it will automatically fill the appropriate textbox. 
+Analysis tab: 
+- Added analysis options for transient measurements: "Plot I-t", "Show Ioff&Ion", "Show rise/fall time". 
+- The user is now notified if the data does not span enough decades for the desired analysis option ("Plot threshold voltage", "Plot sub-threshold swing", and both "Ioff/Ion" options) via filter_regionless(). 
+- When editing an experiment's information, pressing Enter on any of the textboxes saves it. 
+Experiments: 
+- Fixed an error defining the main current. In accordance with the changes in the Channels tab, the main current will always be the designated drain current. 
+- Transient measurements now save the measured data (all four currents, with the main current first, after a time column). 
+- Added an x-axis for the live graphs
+- The off_noise() function (setting the lower bound for the current) is now only called when loading the data for analysis. The saved currents, as well as the ones that are displayed, are now the unmodified currents. 
+- In transient measurements, added the option to limit the total time of the measurement (it will stop once the calculated total time has elapsed, regardless of how many measurements were taken). This is now the default option. 
+- Added an "Abort" button, that stops the experiment but saves the measurements up to that point. 
+
+
+
+v0.1.0: Base program. 
