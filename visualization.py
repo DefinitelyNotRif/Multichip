@@ -1,119 +1,139 @@
 import datetime
-
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 import numpy as np
-# import scipy.interpolate
 import matplotlib.colors as colors
 from tkinter import messagebox
 from statistics import mean
-
 from matplotlib.ticker import MaxNLocator
+from scipy import optimize
+
+
+"""
+This file includes all the function that have to do with calculating certain parameters (e.g. threshold voltage) and 
+visualizing them. 
+"""
 
 
 def off_noise(data, threshold):
-    if type(data[0]) == list:
+    """
+    Sets any values below the set threshold, to it. The purpose of this function is to remove low-current noises.
+    :param data: The data to be filtered.
+    :param threshold: The minimum current, below which the values will be set to it.
+    :return: The filtered data.
+    """
+    if type(data[0]) == list:  # Perform the function recursively.
         return [off_noise(x, threshold) for x in data]
-    return [max(threshold, x) for x in data]
-
-# IDK if I should set the primary and secondary variables explicitly... For now, var1 is VJG and var2 is VBG. VD is constant.
-# The only things that should be changed if different variables are used, are the rows that call each function.
-
-# noise = 10**-12
-# var2 = np.linspace(-25,25,11)
-# var1_nosplit = [-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25,-2.5,-2.457,-2.414,-2.371,-2.328,-2.28525,-2.24225,-2.19925,-2.15625,-2.11325,-2.07025,-2.02725,-1.98425,-1.9415,-1.8985,-1.8555,-1.8125,-1.7695,-1.7265,-1.6835,-1.6405,-1.59775,-1.55475,-1.51175,-1.46875,-1.42575,-1.38275,-1.33975,-1.29675,-1.254,-1.211,-1.168,-1.125,-1.082,-1.039,-0.996,-0.953,-0.91025,-0.86725,-0.82425,-0.78125,-0.73825,-0.69525,-0.65225,-0.60925,-0.5665,-0.5235,-0.4805,-0.4375,-0.3945,-0.3515,-0.3085,-0.2655,-0.22275,-0.17975,-0.13675,-0.09375,-0.05075,-0.00775,0.03525,0.078,0.121,0.164,0.207,0.25]
-# var1 = np.array_split(var1_nosplit, 11) #Generates a 2d list with length 65 and height 11
-# I0_nosplit = off_noise([3.97E-12, 2.45E-12, 2.09E-12, 3.99E-12, 4.05E-12, 4.05E-12, 1.90E-12, 3.88E-12, 1.80E-12, 1.95E-12, 3.80E-12, 1.58E-12, 1.60E-12, 3.20E-12, 1.66E-12, 1.47E-12, 3.46E-12, 1.79E-12, 2.27E-12, 1.22E-12, 3.20E-12, 3.16E-12, 1.37E-12, 1.22E-12, 1.09E-12, 1.22E-12, 3.10E-12, 2.77E-12, 1.20E-12, 2.97E-12, 1.25E-12, 2.78E-12, 1.22E-12, 2.81E-12, 1.78E-12, 2.36E-12, 2.01E-12, 1.87E-12, 1.95E-12, 2.22E-12, 1.57E-12, 1.51E-12, 1.09E-12, 1.54E-12, 1.01E-12, 1.25E-12, 2.02E-12, 2.11E-12, 5.60E-13, 3.90E-13, 4.00E-13, 1.80E-13, 4.00E-14, 6.40E-13, 1.60E-13, 7.50E-13, 7.00E-14, 9.00E-14, 6.00E-13, -3.50E-13, 2.20E-13, 4.17E-12, 2.45E-11, 1.25E-10, 5.62E-10, 9.50E-13, 1.84E-12, 1.07E-12, 7.00E-13, 9.70E-13, 1.45E-12, 1.33E-12, 5.30E-13, 1.05E-12, 1.21E-12, 1.31E-12, 3.40E-13, 7.70E-13, 5.10E-13, 1.26E-12, 1.02E-12, 1.16E-12, 1.03E-12, 1.03E-12, 1.33E-12, 8.81E-13, 7.92E-13, 4.40E-13, 5.95E-13, 6.10E-13, 5.00E-13, 1.50E-13, 1.40E-13, 2.20E-13, 6.50E-13, 2.90E-13, 6.50E-13, 2.00E-13, 4.30E-13, 7.00E-13, 4.10E-13, 2.00E-13, 5.90E-13, 5.30E-13, 2.80E-13, -2.20E-13, 2.10E-13, 4.30E-13, 3.50E-13, 3.70E-13, 1.00E-14, 3.40E-13, 7.00E-14, -7.00E-14, 2.30E-13, 2.00E-13, -2.60E-13, 5.60E-13, -2.10E-13, -4.20E-13, 1.70E-13, 4.70E-13, -3.20E-13, -3.30E-13, -2.50E-13, 7.90E-13, 5.09E-12, 2.80E-11, 1.42E-10, 6.21E-10, 1.01E-12, 8.10E-13, 7.60E-13, 7.70E-13, 8.80E-13, 8.70E-13, 7.00E-13, 8.50E-13, 7.50E-13, 2.70E-13, 9.30E-13, 5.70E-13, 7.10E-13, 4.20E-13, 7.09E-13, 8.47E-13, 5.54E-13, 6.55E-13, 7.70E-14, 7.22E-13, 5.25E-13, 3.25E-13, 2.65E-13, 4.21E-13, 7.39E-13, 4.69E-13, 2.16E-13, 3.30E-14, 5.00E-14, 3.80E-13, -2.50E-13, 3.90E-13, 2.60E-13, 2.90E-13, 5.30E-13, -3.90E-13, 4.50E-13, 4.50E-13, -1.40E-13, -5.40E-13, -4.20E-13, 2.40E-13, -6.20E-13, 3.20E-13, -4.60E-13, 9.00E-14, -6.30E-13, 0, 2.10E-13, -5.10E-13, 6.00E-14, -5.20E-13, -3.60E-13, -3.00E-14, -4.30E-13, -5.30E-13, -1.30E-13, -1.60E-13, -4.60E-13, 1.00E-14, 5.60E-13, 6.12E-12, 3.51E-11, 1.76E-10, 7.52E-10, 7.10E-13, 8.10E-13, 6.80E-13, 1.04E-12, 5.90E-13, 5.40E-13, 3.90E-13, 6.60E-13, 5.00E-13, 2.90E-13, 5.90E-13, 3.70E-13, 2.90E-13, 3.40E-13, 3.20E-13, 3.70E-13, 4.17E-13, 2.52E-13, 2.94E-13, 3.70E-13, 2.30E-13, 4.50E-13, -1.00E-14, 3.00E-13, 1.50E-13, 4.10E-13, 3.40E-13, 1.90E-13, -3.50E-13, 4.00E-13, -3.90E-13, -3.50E-13, -3.40E-13, -4.00E-13, 2.10E-13, -6.50E-13, -1.80E-13, -5.30E-13, 1.80E-13, -5.00E-13, 3.50E-13, -4.90E-13, 4.60E-13, 2.20E-13, 2.00E-13, 2.30E-13, -7.50E-13, 2.60E-13, -5.60E-13, -1.00E-12, -6.60E-13, 1.30E-13, -1.01E-12, -9.50E-13, -8.50E-13, -8.00E-13, 6.00E-14, -9.90E-13, -1.10E-13, -5.50E-13, 1.51E-12, 1.44E-11, 6.98E-11, 3.31E-10, 1.30E-09, 5.70E-13, -2.00E-14, 1.60E-13, 9.80E-13, 9.50E-13, -1.00E-14, 7.70E-13, 4.00E-14, 9.00E-13, 2.20E-13, -1.70E-13, 7.70E-13, -1.20E-13, 5.90E-13, 6.80E-13, 8.00E-14, 7.90E-13, 1.10E-13, 4.80E-13, -2.20E-13, -2.70E-13, 6.30E-13, -4.30E-13, 6.00E-13, -2.00E-13, 3.80E-13, 1.50E-13, -4.80E-13, 4.80E-13, -4.50E-13, 2.70E-13, 2.30E-13, -4.30E-13, -5.40E-13, -3.40E-13, -5.80E-13, -4.50E-13, -2.50E-13, -5.40E-13, -4.00E-14, -2.50E-13, -4.20E-13, 1.10E-13, -2.80E-13, -5.70E-13, -4.60E-13, 1.90E-13, -6.70E-13, -2.40E-13, -7.80E-13, -4.30E-13, -5.10E-13, -2.70E-13, -2.10E-13, -6.70E-13, -2.40E-13, -5.20E-13, -6.90E-13, 5.90E-13, 4.51E-12, 2.72E-11, 1.34E-10, 5.86E-10, 2.09E-09, 5.71E-09, 5.40E-13, 7.70E-13, 4.10E-13, 2.90E-13, 4.60E-13, 4.40E-13, 2.70E-13, 1.30E-13, 1.00E-13, 2.10E-13, -2.00E-14, -1.20E-13, 2.00E-14, 1.10E-13, 2.50E-13, -1.70E-13, 1.70E-13, 3.00E-14, 2.20E-13, -1.50E-13, -1.20E-13, -7.00E-14, -1.20E-13, 7.00E-14, -2.40E-13, -2.30E-13, -1.90E-13, -4.30E-13, -3.50E-13, -9.00E-14, -2.40E-13, -1.40E-13, -1.30E-13, -4.60E-13, -1.70E-13, -2.40E-13, -7.00E-13, -4.10E-13, -5.80E-13, -5.70E-13, -6.60E-13, -1.40E-13, -6.10E-13, -3.50E-13, -7.60E-13, -2.50E-13, 0, -5.50E-13, -7.40E-13, -2.70E-13, -6.60E-13, -1.05E-12, -2.50E-13, -7.30E-13, -1.00E-13, -5.60E-13, 1.66E-12, 9.45E-12, 4.44E-11, 1.94E-10, 7.35E-10, 2.29E-09, 5.76E-09, 1.17E-08, 2.08E-08, 1.16E-12, 8.60E-13, 1.60E-13, 7.10E-13, 6.20E-13, -3.00E-13, 5.00E-14, 5.40E-13, 7.00E-14, 4.10E-13, -9.00E-14, -2.00E-13, 4.70E-13, -5.40E-13, 2.10E-13, -4.40E-13, -1.70E-13, -1.70E-13, 2.20E-13, -1.60E-13, 2.20E-13, -6.90E-13, -4.60E-13, 1.10E-13, -4.13E-13, 2.20E-13, 2.99E-13, 1.58E-13, 3.77E-13, 1.15E-13, 1.91E-13, -4.41E-13, 4.63E-13, 4.40E-14, 2.43E-13, -1.53E-13, -1.91E-13, -1.11E-12, -4.06E-13, -6.29E-13, -7.73E-13, -9.45E-13, -1.90E-14, -7.98E-13, -1.07E-12, -6.90E-13, -9.10E-13, -6.20E-13, -2.30E-13, -1.34E-12, -2.80E-13, -4.40E-13, -8.70E-13, 3.30E-13, 3.46E-12, 1.90E-11, 8.68E-11, 3.58E-10, 1.17E-09, 3.46E-09, 8.43E-09, 1.62E-08, 2.70E-08, 3.99E-08, 5.41E-08, 5.70E-13, 1.50E-13, 3.00E-14, 1.80E-13, 0, 1.90E-13, -5.00E-14, -2.00E-14, 0, 1.40E-13, 5.00E-14, 5.00E-14, 2.10E-13, -1.30E-13, -2.80E-13, 1.10E-13, -3.40E-13, -5.00E-14, -2.30E-13, -3.80E-13, -1.10E-13, -2.28E-13, -3.00E-15, -5.20E-14, 1.86E-13, -2.95E-13, -1.30E-13, -1.30E-13, -6.60E-13, -1.80E-13, -7.70E-13, -1.60E-13, -4.80E-13, -1.00E-14, -1.07E-12, -6.60E-13, 2.00E-13, -9.40E-13, -1.08E-12, -3.70E-13, -6.00E-14, -1.17E-12, -3.40E-13, -1.07E-12, -3.90E-13, -6.00E-13, -1.28E-12, -4.00E-13, -2.00E-14, -1.15E-12, 3.20E-13, 2.05E-12, 1.07E-11, 4.73E-11, 1.85E-10, 6.46E-10, 1.98E-09, 5.49E-09, 1.24E-08, 2.38E-08, 3.86E-08, 5.55E-08, 7.35E-08, 9.09E-08, 1.08E-07, 1.40E-13, -2.50E-13, 3.70E-13, 5.80E-13, -3.50E-13, 5.60E-13, -4.00E-13, 4.30E-13, -2.80E-13, -3.20E-13, 3.60E-13, 4.30E-13, -3.00E-13, -6.30E-13, 2.40E-13, -9.00E-14, -6.00E-13, 6.00E-14, 7.00E-14, -6.00E-13, -6.40E-13, -6.30E-13, -1.30E-13, -3.20E-13, -9.60E-13, -8.40E-13, -6.80E-13, -3.10E-13, -3.50E-13, -3.90E-13, -7.20E-13, -1.80E-13, -8.80E-13, -7.70E-13, -3.70E-13, -5.20E-13, -5.30E-13, -6.40E-13, -1.13E-12, -5.50E-13, -9.50E-13, -7.40E-13, -6.00E-13, -3.90E-13, -9.80E-13, -4.20E-13, 5.40E-13, 3.28E-12, 1.29E-11, 4.19E-11, 1.56E-10, 4.83E-10, 1.38E-09, 3.55E-09, 7.83E-09, 1.57E-08, 2.86E-08, 4.56E-08, 6.39E-08, 8.31E-08, 1.03E-07, 1.22E-07, 1.40E-07, 1.59E-07, 1.77E-07, 9.70E-13, -4.70E-13, -4.20E-13, 5.10E-13, -5.00E-13, 1.70E-13, -2.00E-14, -5.10E-13, -6.90E-13, 6.00E-14, -8.20E-13, 3.80E-13, 5.80E-13, -6.40E-13, -2.00E-13, 6.20E-13, -9.70E-13, 6.20E-13, -7.10E-13, 3.20E-13, -8.10E-13, 3.90E-13, -1.12E-12, -5.90E-13, 2.80E-13, 3.60E-13, -1.04E-12, -1.33E-12, 4.20E-13, -1.01E-12, 1.60E-13, 1.00E-13, -7.20E-13, -9.00E-13, -3.00E-14, -1.40E-12, -1.30E-13, -2.00E-13, 3.00E-14, 2.40E-13, -9.10E-13, 1.13E-12, 3.56E-12, 1.39E-11, 4.06E-11, 1.07E-10, 2.96E-10, 7.44E-10, 1.71E-09, 4.17E-09, 8.45E-09, 1.57E-08, 2.68E-08, 4.23E-08, 5.99E-08, 8.11E-08, 1.01E-07, 1.23E-07, 1.42E-07, 1.62E-07, 1.80E-07, 1.99E-07, 2.18E-07, 2.37E-07, 2.55E-07, 4.80E-13, 4.70E-13, 5.70E-13, 2.00E-13, -5.00E-14, 4.20E-13, 2.41E-13, 3.11E-13, -4.50E-14, -2.00E-14, 9.00E-14, 2.20E-13, -2.80E-13, 2.10E-13, -5.70E-13, 2.60E-13, 6.00E-14, -4.50E-13, -2.80E-13, -3.00E-14, -5.50E-13, -6.80E-13, -6.20E-13, 0, 7.00E-14, -9.40E-13, -1.20E-13, -4.10E-13, 1.00E-13, -9.20E-13, -3.20E-13, -8.00E-14, 1.70E-13, -4.10E-13, 1.49E-12, 2.09E-12, 7.18E-12, 1.96E-11, 4.02E-11, 9.99E-11, 2.22E-10, 5.07E-10, 1.01E-09, 1.91E-09, 3.88E-09, 7.11E-09, 1.24E-08, 2.14E-08, 3.33E-08, 4.91E-08, 6.82E-08, 8.88E-08, 1.10E-07, 1.31E-07, 1.51E-07, 1.71E-07, 1.91E-07, 2.10E-07, 2.29E-07, 2.47E-07, 2.65E-07, 2.84E-07, 3.02E-07, 3.20E-07, 3.39E-07], noise)
-# I0 = np.array_split(I0_nosplit,11)
-# Ia_nosplit = off_noise([5.73E-12, 5.52E-12, 6.36E-12, 5.98E-12, 5.48E-12, 4.89E-12, 5.63E-12, 5.46E-12, 4.81E-12, 4.93E-12, 4.82E-12, 5.21E-12, 4.92E-12, 4.98E-12, 4.84E-12, 4.71E-12, 4.57E-12, 4.28E-12, 4.85E-12, 5.18E-12, 4.92E-12, 4.63E-12, 4.68E-12, 5.06E-12, 4.89E-12, 4.50E-12, 4.86E-12, 4.66E-12, 4.04E-12, 4.48E-12, 4.55E-12, 4.17E-12, 4.52E-12, 4.27E-12, 4.16E-12, 4.60E-12, 4.27E-12, 4.52E-12, 4.15E-12, 4.12E-12, 3.95E-12, 4.13E-12, 4.58E-12, 3.89E-12, 4.03E-12, 3.86E-12, 3.70E-12, 3.87E-12, 3.13E-12, 3.00E-12, 2.98E-12, 3.17E-12, 3.77E-12, 6.01E-12, 9.43E-12, 1.58E-11, 2.86E-11, 5.16E-11, 9.25E-11, 1.72E-10, 3.34E-10, 6.51E-10, 1.30E-09, 2.61E-09, 5.08E-09, 4.98E-12, 5.13E-12, 5.19E-12, 4.32E-12, 4.70E-12, 4.72E-12, 4.87E-12, 4.73E-12, 4.87E-12, 4.33E-12, 4.56E-12, 4.60E-12, 4.30E-12, 4.23E-12, 4.06E-12, 4.55E-12, 4.17E-12, 4.63E-12, 4.44E-12, 4.81E-12, 4.97E-12, 4.57E-12, 4.14E-12, 4.42E-12, 4.49E-12, 3.97E-12, 4.19E-12, 3.93E-12, 4.16E-12, 4.02E-12, 3.98E-12, 3.91E-12, 4.18E-12, 4.11E-12, 3.87E-12, 3.88E-12, 4.34E-12, 4.09E-12, 3.26E-12, 3.99E-12, 3.88E-12, 3.43E-12, 3.12E-12, 3.70E-12, 3.48E-12, 3.38E-12, 2.72E-12, 2.18E-12, 2.62E-12, 2.07E-12, 2.77E-12, 3.05E-12, 4.38E-12, 6.78E-12, 1.20E-11, 2.03E-11, 3.50E-11, 6.11E-11, 1.11E-10, 2.04E-10, 3.88E-10, 7.36E-10, 1.46E-09, 2.83E-09, 5.43E-09, 6.84E-12, 6.79E-12, 6.15E-12, 6.08E-12, 5.77E-12, 5.53E-12, 5.47E-12, 5.43E-12, 5.37E-12, 4.99E-12, 5.04E-12, 5.07E-12, 5.28E-12, 4.88E-12, 4.94E-12, 5.03E-12, 4.96E-12, 5.17E-12, 5.12E-12, 4.92E-12, 5.14E-12, 5.56E-12, 4.57E-12, 4.88E-12, 5.26E-12, 5.27E-12, 4.63E-12, 4.52E-12, 4.40E-12, 4.79E-12, 4.89E-12, 3.92E-12, 5.04E-12, 3.77E-12, 4.18E-12, 5.00E-12, 4.94E-12, 4.85E-12, 4.37E-12, 4.89E-12, 3.60E-12, 4.92E-12, 4.71E-12, 3.14E-12, 4.50E-12, 3.19E-12, 4.13E-12, 4.18E-12, 4.29E-12, 4.99E-12, 6.75E-12, 8.72E-12, 1.29E-11, 1.76E-11, 3.00E-11, 4.68E-11, 7.29E-11, 1.24E-10, 2.03E-10, 3.46E-10, 6.11E-10, 1.09E-09, 1.97E-09, 3.60E-09, 6.49E-09, 9.60E-12, 9.34E-12, 9.87E-12, 9.10E-12, 7.83E-12, 7.56E-12, 9.27E-12, 6.46E-12, 8.92E-12, 7.15E-12, 7.03E-12, 7.40E-12, 8.31E-12, 6.53E-12, 6.93E-12, 8.48E-12, 7.36E-12, 6.45E-12, 8.49E-12, 6.57E-12, 6.84E-12, 7.56E-12, 8.52E-12, 7.98E-12, 5.90E-12, 7.16E-12, 7.67E-12, 6.85E-12, 6.08E-12, 7.22E-12, 7.88E-12, 5.69E-12, 6.68E-12, 6.34E-12, 7.02E-12, 5.30E-12, 5.31E-12, 5.18E-12, 4.41E-12, 6.03E-12, 4.30E-12, 5.86E-12, 3.87E-12, 6.04E-12, 4.69E-12, 6.09E-12, 6.80E-12, 1.00E-11, 1.28E-11, 1.79E-11, 2.94E-11, 4.24E-11, 6.45E-11, 9.86E-11, 1.49E-10, 2.24E-10, 3.34E-10, 5.07E-10, 7.60E-10, 1.13E-09, 1.73E-09, 2.66E-09, 4.14E-09, 6.51E-09, 1.02E-08, 1.67E-11, 1.63E-11, 1.43E-11, 1.72E-11, 1.63E-11, 1.45E-11, 1.38E-11, 1.34E-11, 1.32E-11, 1.43E-11, 1.43E-11, 1.23E-11, 1.37E-11, 1.22E-11, 1.30E-11, 1.20E-11, 1.13E-11, 1.40E-11, 1.41E-11, 1.14E-11, 1.21E-11, 1.09E-11, 1.13E-11, 1.11E-11, 1.25E-11, 1.15E-11, 1.31E-11, 1.14E-11, 1.15E-11, 1.16E-11, 1.11E-11, 1.05E-11, 1.15E-11, 1.14E-11, 9.97E-12, 9.61E-12, 1.09E-11, 9.69E-12, 1.19E-11, 1.22E-11, 1.49E-11, 1.81E-11, 2.41E-11, 3.59E-11, 4.33E-11, 5.94E-11, 8.41E-11, 1.22E-10, 1.78E-10, 2.50E-10, 3.51E-10, 4.90E-10, 6.66E-10, 9.38E-10, 1.29E-09, 1.76E-09, 2.36E-09, 3.20E-09, 4.19E-09, 5.55E-09, 7.33E-09, 9.72E-09, 1.29E-08, 1.71E-08, 2.28E-08, 5.37E-11, 5.64E-11, 5.17E-11, 5.07E-11, 4.44E-11, 4.41E-11, 4.45E-11, 4.43E-11, 4.21E-11, 4.15E-11, 4.21E-11, 3.98E-11, 3.65E-11, 3.95E-11, 4.09E-11, 3.88E-11, 3.68E-11, 3.70E-11, 3.58E-11, 3.70E-11, 3.66E-11, 3.39E-11, 3.23E-11, 3.44E-11, 3.37E-11, 3.36E-11, 3.19E-11, 3.02E-11, 2.79E-11, 3.08E-11, 2.89E-11, 2.92E-11, 3.07E-11, 3.20E-11, 3.27E-11, 3.68E-11, 5.14E-11, 6.37E-11, 8.17E-11, 1.03E-10, 1.40E-10, 2.07E-10, 2.83E-10, 4.04E-10, 5.72E-10, 7.67E-10, 1.11E-09, 1.46E-09, 1.95E-09, 2.61E-09, 3.51E-09, 4.57E-09, 5.59E-09, 7.12E-09, 9.07E-09, 1.13E-08, 1.33E-08, 1.59E-08, 1.82E-08, 2.14E-08, 2.52E-08, 2.90E-08, 3.37E-08, 3.94E-08, 4.67E-08, 1.49E-10, 1.52E-10, 1.51E-10, 1.46E-10, 1.44E-10, 1.37E-10, 1.44E-10, 1.36E-10, 1.28E-10, 1.30E-10, 1.22E-10, 1.30E-10, 1.22E-10, 1.17E-10, 1.19E-10, 1.23E-10, 1.12E-10, 1.18E-10, 1.03E-10, 1.06E-10, 1.03E-10, 1.02E-10, 1.01E-10, 1.03E-10, 1.06E-10, 1.13E-10, 1.16E-10, 1.33E-10, 1.71E-10, 2.31E-10, 2.96E-10, 3.60E-10, 5.46E-10, 7.63E-10, 1.01E-09, 1.41E-09, 1.72E-09, 2.39E-09, 2.94E-09, 3.64E-09, 4.42E-09, 5.48E-09, 7.10E-09, 8.09E-09, 9.77E-09, 1.19E-08, 1.41E-08, 1.64E-08, 1.82E-08, 2.11E-08, 2.35E-08, 2.65E-08, 3.01E-08, 3.31E-08, 3.79E-08, 4.16E-08, 4.60E-08, 4.96E-08, 5.38E-08, 5.81E-08, 6.26E-08, 6.71E-08, 7.25E-08, 7.90E-08, 8.67E-08, 3.12E-10, 3.40E-10, 3.30E-10, 3.47E-10, 3.45E-10, 3.33E-10, 3.44E-10, 3.40E-10, 3.52E-10, 3.41E-10, 3.45E-10, 3.44E-10, 3.30E-10, 3.30E-10, 3.23E-10, 3.32E-10, 3.25E-10, 3.36E-10, 4.14E-10, 5.34E-10, 6.90E-10, 1.12E-09, 1.38E-09, 2.01E-09, 3.48E-09, 4.57E-09, 6.21E-09, 7.34E-09, 9.82E-09, 1.06E-08, 1.49E-08, 1.73E-08, 2.04E-08, 2.43E-08, 2.84E-08, 3.14E-08, 3.46E-08, 3.81E-08, 4.29E-08, 4.68E-08, 5.04E-08, 5.40E-08, 5.66E-08, 6.11E-08, 6.37E-08, 6.59E-08, 6.95E-08, 7.32E-08, 7.62E-08, 7.91E-08, 8.24E-08, 8.55E-08, 8.88E-08, 9.21E-08, 9.50E-08, 9.84E-08, 1.02E-07, 1.05E-07, 1.09E-07, 1.13E-07, 1.17E-07, 1.22E-07, 1.28E-07, 1.35E-07, 1.44E-07, 1.04E-09, 1.02E-09, 1.00E-09, 8.71E-10, 8.69E-10, 8.46E-10, 7.93E-10, 8.53E-10, 8.18E-10, 8.20E-10, 9.10E-10, 1.11E-09, 1.65E-09, 2.47E-09, 3.82E-09, 5.03E-09, 7.52E-09, 1.18E-08, 1.69E-08, 2.30E-08, 2.73E-08, 3.36E-08, 3.89E-08, 4.39E-08, 5.11E-08, 5.47E-08, 5.98E-08, 6.46E-08, 6.90E-08, 7.29E-08, 7.76E-08, 8.18E-08, 8.64E-08, 8.92E-08, 9.32E-08, 9.75E-08, 1.01E-07, 1.04E-07, 1.08E-07, 1.11E-07, 1.14E-07, 1.18E-07, 1.21E-07, 1.24E-07, 1.28E-07, 1.31E-07, 1.34E-07, 1.38E-07, 1.41E-07, 1.44E-07, 1.48E-07, 1.51E-07, 1.55E-07, 1.58E-07, 1.62E-07, 1.66E-07, 1.70E-07, 1.74E-07, 1.78E-07, 1.82E-07, 1.86E-07, 1.92E-07, 1.98E-07, 2.05E-07, 2.14E-07, 2.91E-09, 2.90E-09, 3.18E-09, 3.63E-09, 4.98E-09, 6.42E-09, 9.59E-09, 1.53E-08, 1.99E-08, 2.80E-08, 3.42E-08, 4.24E-08, 4.96E-08, 5.78E-08, 6.61E-08, 7.33E-08, 8.15E-08, 8.68E-08, 9.16E-08, 9.58E-08, 1.03E-07, 1.07E-07, 1.12E-07, 1.17E-07, 1.21E-07, 1.25E-07, 1.29E-07, 1.33E-07, 1.37E-07, 1.41E-07, 1.45E-07, 1.48E-07, 1.52E-07, 1.56E-07, 1.60E-07, 1.64E-07, 1.67E-07, 1.71E-07, 1.75E-07, 1.79E-07, 1.82E-07, 1.86E-07, 1.90E-07, 1.94E-07, 1.97E-07, 2.01E-07, 2.05E-07, 2.09E-07, 2.13E-07, 2.17E-07, 2.21E-07, 2.25E-07, 2.29E-07, 2.32E-07, 2.36E-07, 2.40E-07, 2.45E-07, 2.49E-07, 2.54E-07, 2.58E-07, 2.63E-07, 2.69E-07, 2.76E-07, 2.83E-07, 2.93E-07, 6.97E-08, 7.34E-08, 8.20E-08, 8.79E-08, 9.32E-08, 1.01E-07, 1.07E-07, 1.14E-07, 1.20E-07, 1.24E-07, 1.29E-07, 1.36E-07, 1.39E-07, 1.45E-07, 1.50E-07, 1.53E-07, 1.58E-07, 1.63E-07, 1.67E-07, 1.71E-07, 1.75E-07, 1.79E-07, 1.84E-07, 1.88E-07, 1.91E-07, 1.96E-07, 2.00E-07, 2.04E-07, 2.08E-07, 2.12E-07, 2.16E-07, 2.19E-07, 2.24E-07, 2.27E-07, 2.31E-07, 2.35E-07, 2.39E-07, 2.43E-07, 2.47E-07, 2.51E-07, 2.55E-07, 2.59E-07, 2.63E-07, 2.67E-07, 2.71E-07, 2.75E-07, 2.80E-07, 2.84E-07, 2.88E-07, 2.92E-07, 2.97E-07, 3.01E-07, 3.06E-07, 3.10E-07, 3.15E-07, 3.20E-07, 3.25E-07, 3.29E-07, 3.35E-07, 3.40E-07, 3.46E-07, 3.52E-07, 3.59E-07, 3.67E-07, 3.77E-07], noise)
-# Ia = np.array_split(Ia_nosplit,11)
+    return [max(threshold, x) for x in data]  # If the value is lower than the threshold, set it to the threshold.
 
 
 def remove_latex(s):
-    if '$' in s:  # In case it's in LaTeX, make it readable in plaintext.
+    """
+    Convert a string formatted in LaTeX - mainly used in the axis labels in the graphs - to a regular string, which
+    can then be displayed in a messagebox.
+    :param s: The string to be converted.
+    :return: The "pure" string.
+    """
+    if '$' in s:  # In case it's in LaTeX, make it readable in plaintext. Remove all LaTeX-related characters.
         return str(s).replace('$', '').replace('\\', '').replace('_', '').replace('{', '').replace('}', '')
-    else:
+    else:  # If it's already humanly readable
         return str(s)
 
 
 def plot_yvv(primary, secondary, y, labelx, labely, log, last_right=False):
-    # if len(secondary) == 1:
-    #     plot_yv(primary, y[0], labelx, labely)
-    #     return
-    if all([len(row) == 1 for row in y]):  # There is only 1 data point per secondary value.
+    """
+    Plots the values of (each row of) y against the primary variable, for each value of the secondary variable.
+    Note that the secondary variable may also consist of labels (e.g. ["Dry Air", "Exposed"]).
+    :param primary: The primary variable - a list of lists, each corresponding to a different secondary variable value.
+    :param secondary: The secondary variable - a 1D list.
+    :param y: The data to be plotted - a list of lists, each corresponding to a different secondary variable value.
+    :param labelx: The label for the x-axis.
+    :param labely: The label for the y-axis
+    :param log: Whether the y-axis should be in a logarithmic scale.
+    :param last_right: If True, the last row of the primary variable and y will be plotted on a separate axis, which
+    will be positioned to the right of the graph.
+    """
+    if all([len(row) == 1 for row in y]):  # There is only 1 data point per secondary value
         msg = ''
-        for s, val in zip(secondary, y):
-            val_msg = str(float('%.4g' % val[0]))
-            msg += (remove_latex(s) + ': ' + val_msg + '\n')
+        for s, val in zip(secondary, y):  # Show a messagebox with the value, for each secondary variable value.
+            val_msg = str(float('%.4g' % val[0]))  # Round the value
+            msg += (remove_latex(s) + ': ' + val_msg + '\n')  # e.g. "Dry Air: 0.1"
         messagebox.showinfo('', msg[:-1])  # The [:-1] clips the '\n' at the end
         return
-    font = {'family': 'Times New Roman',
-            'size': 10,
-            }
-    # matplotlib.rcParams['toolbar'] = 'None'
-    if last_right:
-        fig, ax1 = plt.subplots(figsize=(3.5, 3.5))
-        ax2 = ax1.twinx()
-        ax1.format_coord = lambda x, y: ''
-        ax2.format_coord = lambda x, y: ''
-        for i in range(0, len(secondary)-1):
+    font = {'family': 'Times New Roman', 'size': 10, }
+    # matplotlib.rcParams['toolbar'] = 'None'  # Uncomment to disable the toolbar below the graph
+    if last_right:  # Create two x-axes, which prevents us from using plt.___() functions
+        fig, ax1 = plt.subplots(figsize=(3.5, 3.5))  # Standard figure size
+        ax2 = ax1.twinx()  # Right axis
+        ax1.format_coord = lambda x, y: ''  # Hide the coordinates at the bottom, to prevent the figure from constantly
+        ax2.format_coord = lambda x, y: ''  # stretching and flickering!
+        for i in range(0, len(secondary)-1):  # Plot all but the last series
             ax1.plot(primary[i], y[i])
         if all([type(l) != str for l in secondary[:-1]]):   # If the secondary axis consists of numbers, round them to
                                                             # avoid float errors.
             ax1.legend([str(round(x, 3)) for x in secondary[:-1]], prop=font, loc='center left')
-        else:
+        else:  # If the secondary variable consists of text (labels)
             ax1.legend([str(x) for x in secondary[:-1]], prop=font, loc='center left')
-        ax2.plot(primary[-1], y[-1], color='g')
+        ax2.plot(primary[-1], y[-1], color='g')  # Plot the right series
         plt.rcParams.update({'mathtext.default': 'regular'})
         if log:
             plt.yscale('log')
-        ax1.set_xlabel(labelx, fontdict=font)
+        ax1.set_xlabel(labelx, fontdict=font)  # Set the labels to have the standard font
         ax2.set_xlabel(labelx, fontdict=font)
         ax1.set_ylabel(labely, fontdict=font)
         ax2.set_ylabel(secondary[-1], fontdict=font)
         ax1.tick_params(labelsize=10)
         ax2.tick_params(labelsize=10)
-
-        # plt.savefig('IV from test data.png', bbox_inches="tight")
         plt.tight_layout(h_pad=None, w_pad=None, rect=None)
         plt.show()
     else:
-        figure(figsize=(3.5, 3.5))
-        plt.gca().format_coord = lambda x, y: ''
-        for i in range(0, len(secondary)):
+        figure(figsize=(3.5, 3.5))  # Standard figure size
+        plt.gca().format_coord = lambda a, b: ''  # Hide the coordinates at the bottom
+        for i in range(0, len(secondary)):  # Plot all the series
             plt.plot(primary[i], y[i])
-        plt.rcParams.update({'mathtext.default':  'regular' })
+        plt.rcParams.update({'mathtext.default':  'regular'})
         if log:
             plt.yscale('log')
-        plt.xlabel(labelx, fontdict=font)
+        plt.xlabel(labelx, fontdict=font)  # Set the labels to have the standard font
         plt.ylabel(labely, fontdict=font)
         plt.xticks(fontsize=10, fontname='Times New Roman')
         plt.yticks(fontsize=10, fontname='Times New Roman')
-        plt.locator_params(axis='x', nbins=6)
+        locator = MaxNLocator(nbins=6)  # These two rows are supposed to prevent the x-axis from being so dense it
+        plt.gca().xaxis.set_major_locator(locator)  # becomes unreadable.
         if all([type(l) != str for l in secondary[:-1]]):   # If the secondary axis consists of numbers, round them to
                                                             # avoid float errors.
             plt.legend([str(round(x, 3)) for x in secondary], prop=font)
-        else:
+        else:  # If the secondary variable consists of text (labels)
             plt.legend([str(x) for x in secondary], prop=font)
-        # plt.savefig('IV from test data.png', bbox_inches="tight")
         plt.tight_layout(h_pad=None, w_pad=None, rect=None)
         plt.show()
 
 
 def plot_yv(x, y, labelx, labely, forcelin=False, transient=False):
-    if len(x) == 1:
-        messagebox.showinfo('', remove_latex(labely) + ": " + str(float('%.4g' % y[0])))
+    """
+    Plots y as a function of x, but with the standard formatting and the specified labels.
+    So it's basically a glorified plt.plot().
+    :param x: The x-axis values.
+    :param y: The data to be plotted.
+    :param labelx: The label for the x-axis.
+    :param labely: The label for the y-axis.
+    :param forcelin: If True, forces the y-axis scale to be linear. Otherwise, it determines the scale based on the
+    range that the data spans.
+    :param transient: Whether the data is from a transient measurement. If True, it modified the x-axis ticks so they're
+    not so dense they're unreadable.
+    """
+    if len(x) == 1:  # If there is only one data point (e.g. the user chose "Show Threshold Voltage" for a single sweep)
+        messagebox.showinfo('', remove_latex(labely) + ": " + str(float('%.4g' % y[0])))  # Just display a messagebox
         return
-    # matplotlib.rcParams['toolbar'] = 'None'
-    figure(figsize=(3.5, 3.5))
-    plt.gca().format_coord = lambda x, y: ''
+    # matplotlib.rcParams['toolbar'] = 'None'  # Uncomment to disable the toolbar below the graph
+    figure(figsize=(3.5, 3.5))  # Standard figure size
+    plt.gca().format_coord = lambda a, b: ''  # Hide the coordinates at the bottom
     font = {'family': 'Times New Roman',
             'size': 10,
             }
     plt.plot(x, y)
     plt.rcParams.update({'mathtext.default': 'regular'})
-    plt.xlabel(labelx, fontdict=font)
+    plt.xlabel(labelx, fontdict=font)  # Set the labels to have the standard font
     plt.ylabel(labely, fontdict=font)
     plt.xticks(fontsize=10, fontname='Times New Roman')
     plt.yticks(fontsize=10, fontname='Times New Roman')
@@ -121,37 +141,53 @@ def plot_yv(x, y, labelx, labely, forcelin=False, transient=False):
         locator = MaxNLocator(nbins=6)
         plt.gca().xaxis.set_major_locator(locator)
         plt.gca().xaxis.set_major_formatter(lambda x, pos: str(datetime.timedelta(seconds=x)))
-    if max(y)/100 > min(y) and not forcelin:
+    if max(y)/100 > min(y) and not forcelin:  # The axis scale is logarithmic if the data spans at least two decades
         plt.yscale('log')
-    # plt.savefig('IV from test data.png', bbox_inches="tight")
     plt.tight_layout(h_pad=None, w_pad=None, rect=None)
     plt.show()
 
 
-closest = lambda lst, val : min(lst, key=lambda x:abs(x-val))
-
-def vth_constant(V1, V2, I, const):
-    VTH = []
-    for i in range(len(V2)):
-        # Iarr = np.asarray(I[i])
-        # if not any(Iarr > const):
-        #     VTH.append(max(V1[i]))  # TODO: Do something else...
-        # else:
-        #     VTH.append(V1[i][list(I[i]).index(min(Iarr[Iarr > const]))])
-        VTH.append(V1[i][list(I[i]).index(closest(I[i], const))])
-    return VTH
+def closest(lst, val): return min(lst, key=lambda x: abs(x-val))  # Returns the value in lst that is closest to val. 
 
 
-def vth_rel(V1, V2, I, threshold): #USE WITH FILTERED!
-    VTH=[]
-    for i in range(len(V2)):
-        imax = max(I[i])
-        imin = min(I[i])
-        VTH.append(V1[i][list(I[i]).index(closest(I[i], (imax-imin)*threshold+imin))])
-    return VTH
+def vth_constant(v1, v2, i, const):
+    """
+    Returns the threshold voltage of each sweep.
+    The threshold voltage is defined as the voltage where the current reaches a specified threshold (const).
+    :param v1: The primary variable (voltage). A list of len(v2) lists. 
+    :param v2: The secondary variable (voltage). A 1D list. 
+    :param i: The current for each point. A list of len(v2) lists.
+    :param const: The threshold current that defines the threshold voltage.
+    :return: A list (of length len(v2)) containing the threshold voltage for each value of v2.
+    """
+    return [v1[j][list(i[j]).index(closest(i[j], const))] for j in range(len(v2))]
+    # Explanation: For each secondary voltage value (the index of which is j), take the respective row of the current,
+    # and find the index for which the current is closest to the threshold current. Then, return the primary voltage
+    # value that corresponds to that current (that is, that index in the j-th row of v1).
 
 
-# gavg = lambda arr: np.exp(np.mean(np.log(arr)))
+def vth_rel(v1, v2, i, threshold): #USE WITH FILTERED!
+    """
+    Returns the threshold voltage of each sweep.
+    The threshold voltage is defined relatively to the minimum and maximum current values. For example, if the threshold
+    parameter is 0.2, then the threshold current is defined as 20% of the way between the minimum and maximum currents,
+    and the threshold voltage is defined accordingly.
+    Since this method is defined by the most extreme current values, it must be used in conjunction with
+    filter_regionless()!
+    :param v1: The primary variable (voltage). A list of len(v2) lists.
+    :param v2: The secondary variable (voltage). A 1D list.
+    :param i: The current for each point. A list of len(v2) lists.
+    :param threshold: The percentage that defines the threshold current, as explained above. A float between 0 and 1.
+    :return: A list (of length len(v2)) containing the threshold voltage for each value of v2.
+    """
+    vth = []
+    for j in range(len(v2)):  # For each secondary voltage value
+        imax = max(i[j])  # Find the minimum and maximum currents
+        imin = min(i[j])
+        vth.append(v1[j][list(i[j]).index(closest(i[j], (imax - imin) * threshold + imin))])
+        # The logic here is similar to that in vth_constand(), with the only difference being the second argument in
+        # the closest() function (i.e., the "target" threshold current).
+    return vth
 
 
 # from scipy import ndimage
@@ -159,79 +195,142 @@ def smooth(arr, win):
     # arr = np.asarray(lst)
     filtered = []
     for i in range(len(arr)):
-        filtered.append(mean(arr[max(i-win, 0):min(i+win, len(arr))]))
+        if i < win:
+            filtered.append(np.mean(arr[0:2*i+1]))
+        elif i + win + 1 > len(arr):
+            filtered.append(np.mean(arr[-2*(len(arr)-i)+1:]))
+        else:
+            filtered.append(np.mean(arr[i-win:i+win+1]))
+        # filtered.append(mean(arr[max(i - win, 0):min(i + win, len(arr))]))
     return filtered
 
 
-def vth_sd(V1, V2, I):
+def vth_sd(v1, v2, I):
     VTH = []
     win = 3
-    for i in range(len(V2)):
+    for i in range(len(v2)):
         zd = np.asarray(I[i])
-        # zd = smooth(zd, win)
+        # spl = scipy.interpolate.splrep(v1[i], i[i], k=3)
+        # ddy = scipy.interpolate.splev(v1[i], spl, der=2)
+        zd = smooth(zd, win)
         fd = np.gradient(zd)
-        fd = smooth(fd, win)
+        # fd = smooth(fd, win)
         sd = np.gradient(fd)
         # sd = smooth(sd, win)
-        plt.plot(fd)
-        VTH.append(V1[i][list(sd).index(max(sd))])
-    # plt.yscale('log')
+        # ddy_spl = scipy.interpolate.splrep(v1[i], sd, k=3)
+        plt.plot(zd)
+        # plt.plot(np.gradient(np.gradient(smooth(spl[1], win)))[:-8])
+        # print(len(v1))
+        # m = v1[i][-1]
+        # for j in range(len(v1[i])-1):
+        #     if i[i][j] > 1.1*i[i][j+1]:
+        #         m = v1[i][j]
+        #         break
+        # VTH.append(m)
+
+        # peaks = scipy.signal.find_peaks(sd[:-win], prominence=max(sd)/10)[0]
+        # print(str(v2[i]) + ": " + str(peaks) + " -> " + str(v1[i][peaks[0]]))
+        # VTH.append(v1[i][peaks[0]])
+
+        # VTH.append(v1[i][list(sd).index(max(sd))])
+    plt.yscale('log')
     plt.show()
     return VTH
 
 
-def vth_lin(V1, V2, I):
+import numpy.polynomial.polynomial as npoly
+
+
+
+
+
+
+import piecewise_regression
+def vth_lin(v1, v2, I):
+
+
     VTH = []
-    for i in range(len(V2)):
-        zd = np.asarray(I[i])
-        # zd = smooth(zd, win)
-        fd = np.gradient(zd)
-        # fd = smooth(fd, win)
-        sd = list(np.gradient(fd))[:60]
-        maxidx = sd.index(max(sd))
-        indices = [index for index, value in enumerate(sd) if index >= maxidx and value <= 0]
-        if indices == []:
-            VTH.append(V1[i][-1])
-        else:
-            lin = zd[indices[0]:]
-            linx = V1[i][indices[0]:]
-            slope = (lin[-1]-lin[0])/(linx[-1]-linx[0])
-            mid = round(len(lin)/2)
-            b = lin[mid] - slope * linx[mid]
-            th = -b/slope
-            VTH.append(th)
-            # linfunc = [slope * x + b for x in V1[i]]
-            # figure()
-            # plt.plot(V1[i], I[i])
-            # plt.plot(V1[i], linfunc)
-            # plt.show()
+    for i in range(len(v2)):
+        # pw_fit = piecewise_regression.Fit(v1[i], i[i], n_breakpoints=1)
+        # VTH.append(pw_fit.get_results()['estimates']['breakpoint1']['estimate'])
+        # pw_fit.plot_data(color="grey", s=20)
+        # pw_fit.plot_fit(color="red", linewidth=4)
+        # plt.show()
+
+        def piecewise_linear(x, x0, y0, k1, k2):
+            return np.piecewise(x, [x < x0], [lambda x: k1 * x + y0 - k1 * x0, lambda x: k2 * x + y0 - k2 * x0])
+
+        x, y = v1[i], I[i]
+        y = [a/max(y) for a in y]  # Normalize
+        p, e = optimize.curve_fit(piecewise_linear, x, y, [np.mean([min(x), max(x)]), 0, 0, 0.5/(max(x)-min(x))])
+        VTH.append(p[0] - p[1] / p[3])  # x0 - (y0/k2) gives the intersection of the right line with zero
+        # th = p[0] - p[1] / p[3]
+        # plt.plot(x, y, "o")
+        # plt.plot(x, piecewise_linear(x, *p))
+        # plt.plot(th, 0, "o")
+        # plt.show()
     return VTH
 
 
+def vth_lin_alt(v1, v2, I):
+    for i in range(len(v2)):
+        off = ioff(I[i])
+        li = np.log10(np.asarray(I[i]))
+        plt.plot(li)
+        plt.plot(np.ones(len(I[i]))*np.log10(off))
+        plt.show()
+        # if i[i][-1] < off:  # No on-region - shouldn't be accessed, because of filter_regionless()!!!
+        #     print("No on-region!")
+        # else:
+        #     for j in range(len(li)-1, -1, -1):  # Go backwards from the end. Find the LEFTMOST POINT in the RIGHTMOST
+        #         if i[i][j] < off:               # BLOCK that's greater than the off-threshold.
+        #             lower = i[i][j+1]
+        #             break
+        #     else:  # No off-region - should never be accessed...
+        #         print("No off-region?!")
+
+
+
 def response(I0, Ia):
+    """
+    Given two characteristics - before and after the exposure - this function calculates and returns the response for
+    each point.
+    :param I0: The pre-exposure currents.
+    :param Ia: The post-exposure currents.
+    :return: The response for each point.
+    (All three are nested lists)
+    """
     s = []
     for i in range(len(I0)):
-        srow=[]
-        for j in range(len(I0[i])):
-            Ihigh = max(I0[i][j],Ia[i][j])
-            Ilow = min(I0[i][j],Ia[i][j])
-            srow.append(abs((Ihigh-Ilow)/Ilow))
+        srow=[]  # A temporary list to store the values for each row
+        for j in range(len(I0[i])):  # Append the response
+            srow.append(abs((I0[i][j]-Ia[i][j])/min(I0[i][j], Ia[i][j])))
         s.append(srow)
     return s
 
 
 def plot_heatmap(mat, varx, vary, labelx, labely, labelc, interp):
-    if len(varx) == 1:
+    """
+    Plots a heatmap of the data in mat.
+    :param mat: The data to be plotted.
+    :param varx: The x-axis values (the secondary variable).
+    :param vary: The y-axis values (the primary variable).
+    :param labelx: The x-axis label.
+    :param labely: The y-axis label.
+    :param labelc: The label for the color bar.
+    :param interp: If True, attempts to interpolate the heatmap and increase the resolution. Currently unused!
+    """
+    if len(varx) == 1:  # If there is only one column, just plot a regular graph.
         plot_yv(vary[0], mat[0], labely, labelc)
         return
-    fig = figure(figsize=(3.5, 3.5))
+    fig = figure(figsize=(3.5, 3.5))  # Standard figure size
     # matplotlib.rcParams['toolbar'] = 'None'
-    plt.gca().format_coord = lambda x, y: ''
+    plt.gca().format_coord = lambda x, y: ''  # Hide the coordinates at the bottom
     font = {'family': 'Times New Roman',
             'size': 10,
             }
     plt.rcParams.update({'mathtext.default': 'regular'})
-    plt.xlabel(labelx, fontdict=font)
+    plt.xlabel(labelx, fontdict=font)  # Set the labels to have the standard font
     plt.ylabel(labely, fontdict=font)
     plt.xticks(fontsize=10, fontname='Times New Roman')
     plt.yticks(fontsize=10, fontname='Times New Roman')
@@ -251,84 +350,123 @@ def plot_heatmap(mat, varx, vary, labelx, labely, labelc, interp):
         # zi = interp(xi, yi)
         # plt.pcolormesh(xi, yi, zi, shading='auto', cmap='plasma')
         pass
-    else:
+    else:  # For now, only this part is reached
         x = varx
         # y = vary
-        y = vary[0]
-        z = np.asarray(mat).transpose()
-        z[z < 1e-12] = 1e-12  # To prevent 0 values with a log scale
+        y = vary[0]  # Only take one row of the primary variable. They're supposed to be virtually identical anyways
+        z = np.asarray(mat).transpose()  # Transpose so that the primary variable is on the y-axis and the secondary
+        # variable is on the x-axis.
+        z[z < 1e-12] = 1e-12  # Set a minimum current, to prevent 0 values with a log scale
         plt.pcolormesh(x, y, z, shading='auto', cmap='plasma', norm=colors.LogNorm(vmin=z.min(), vmax=z.max()))
-    cbar = plt.colorbar(fraction=0.22)
+    cbar = plt.colorbar(fraction=0.22)  # Set up the color bar. fraction = essentially its width...?
     # print(cbar.fraction)
-    cbar.set_label(labelc, labelpad=8, rotation=270, fontdict=font)
-    cbar.format_coord = lambda x, y: ''
+    cbar.set_label(labelc, labelpad=8, rotation=270, fontdict=font)  # Set the colorbar label
+    cbar.format_coord = lambda x, y: ''  # Hide the coordinates at the bottom
     plt.show()
 
 
-def sts(V, I):
-    zd = np.log(np.asarray(I))
-    fd = np.gradient(zd)
+def sts(V, I, threshold=0.7):
+    """
+    Calculates the sub-threshold swing for an i-V sweep.
+    :param V: The x-axis values (voltages).
+    :param I: The y-axis values (currents).
+    :return: The sub-threshold swing for the sweep (float).
+    """
+    zd = np.log(np.asarray(I))  # Convert the data to an array, and take its log
+    fd = np.gradient(zd)  # First derivative
     # plt.plot(fd)
-    halfmax = fd.min() + 0.7 * (fd.max() - fd.min())  # TODO: Arbitrarily defined by 0.7. Is there a value I "should" use?
-    STz = zd[fd > halfmax]
-    STv = np.asarray(V)[fd > halfmax]
-    if len(STz) < 2 or len(STv) < 2:
-        raise ZeroDivisionError
+    halfmax = fd.min() + threshold * (fd.max() - fd.min())  # Finds the value that's 70% of the way between the minimum and
+    # maximum derivative values. The sub-threshold region will then be defined as the region where the derivative is
+    # higher than this value. Since a typical i-V graph would be split into three segments - constant, exponential,
+    # linear - its log would be split into constant, linear, and logarithmic segments. Of these, the linear segment
+    # (exponential in the original graph) would have the highest derivative! Thus, this definition of the sub-threshold
+    # region attempts to contain that entire segment.
+    # TODO: Arbitrarily defined by 0.7. Is there a value i "should" use?
+    STz = zd[fd > halfmax]  # Current (log) values for the sub-threshold region.
+    STv = np.asarray(V)[fd > halfmax]  # Derivative values for the sub-threshold region
+    if len(STz) < 2 or len(STv) < 2:  # If the sub-threshold region is too small, the sts cannot be calculated.
+        raise ZeroDivisionError  # Because of the denominator in the expression below
     else:
-        slope = (STz[-1] - STz[0]) / (STv[-1] - STv[0])
-        # slope = max(fd)
-        return np.log(10)/slope
+        slope = (STz[-1] - STz[0]) / (STv[-1] - STv[0])  # The slope of a linear approximation between the edges of
+        # the sub-threshold region.
+        return np.log(10)/slope  # Return the STS
 
 
-def ioff(I):
-    Iarr = np.asarray((I))
-    li = np.log(Iarr)
-    halfmax = li.min() + 0.2 * (li.max() - li.min()) #TODO: Arbitrarily defined as 0.2!
-    off = Iarr[li < halfmax]
-    return np.average(off)
+def ioff(I, threshold=0.2):
+    """
+    Returns the off-current for a given series of currents.
+    Currently, it's defined as the average current of the lower 20% of the current range. TODO: Better definition!!!
+    :param I: The current data.
+    :param threshold: The threshold below which the device is considered off - defaults to 20% (the lower 20% of the
+    range in a log scale).
+    """
+    Iarr = np.asarray(I)  # Convert the current to an array
+    li = np.log(Iarr)  # Log scale
+    halfmax = li.min() + threshold * (li.max() - li.min())  # Find the 20% threshold
+    off = Iarr[li < halfmax]  # Get the current in the off-region
+    return np.average(off)  # Return its average
 
 
-def ion(I, threshold): #TODO: The "on" region is defined by an arbitrary threshold. Maybe make it relative? Maybe define it by the derivative?!
-    Iarr = np.asarray((I))
-    on = Iarr[Iarr >= threshold]
+def ion(I, threshold):  # TODO: The "on" region is defined by an arbitrary threshold. Maybe make it relative? Maybe define it by the derivative?!
+    """
+    Returns the on-current for a given series of currents.
+    Currently, the on-current is defined as the average current in the region that's above a specified threshold.
+    TODO: Better definition!!!
+    :param I:  The current data.
+    :param threshold: The threshold that defines the on-current.
+    """
+    Iarr = np.asarray(I)  # Convert the current to an array
+    on = Iarr[Iarr >= threshold]  # Get the current in the on-region
     if on.size != 0:
-        return np.average(on)
-    else:
+        return np.average(on)  # Return its average
+    else:  # If the on-region doesn't exist
         return 0
 
 
-def filter_regionless(V1, V2, i0, ia=None):
-    v1_filtered = []
-    v2_filtered = []
+def filter_regionless(v1, v2, i0, ia=None):
+    """
+    Given a complete data set (primary and secondary variables, pre- and optionally post-exposure currents), filters
+    out the sweeps where the current spans less than 2.5 decades (arbitrary, may be changed).
+    This is required for calculations that require a transition from the off-region to the on-region, such as the
+    threshold voltage.
+    :param v1: The primary variable (voltages). A list of lists of length len(v2).
+    :param v2: The secondary variable (voltages).
+    :param i0: The pre-exposure currents. A list of lists of length len(v2).
+    :param ia: The post-exposure currents. A list of lists of length len(v2).
+    :return: The filtered lists. If ia wasn't given, it's not returned either.
+    """
+    v1_filtered = []  # These lists will contain the sweeps that DO span more than 2.5 decades.
+    v2_filtered = []  # (That is, these are the lists that will be returned in the end.)
     i0_filtered = []
     ia_filtered = []
     threshold = 2.5
-    if V2 is not None:
-        for i in range(len(V2)):
-            if ia is not None:
+    if v2 is not None:  # Called from some kind of sweep measurement
+        for i in range(len(v2)):
+            if ia is not None:  # Exposure
                 if max(i0[i])/(10**threshold) > min(i0[i]) and max(ia[i])/(10**threshold) > min(ia[i]):
-                    v1_filtered.append(V1[i])
-                    v2_filtered.append(V2[i])
+                    # If both currents span more than 2.5 decades, append the sweep to the new lists.
+                    v1_filtered.append(v1[i])
+                    v2_filtered.append(v2[i])
                     i0_filtered.append(i0[i])
                     ia_filtered.append(ia[i])
-            else:
-                if max(i0[i]) / (10 ** threshold) > min(i0[i]): #TODO: There's probably a more elegant way to write this. I'm tired.
-                    v1_filtered.append(V1[i])
-                    v2_filtered.append(V2[i])
+            else:  # Characteristic or periodic sweep
+                if max(i0[i]) / (10 ** threshold) > min(i0[i]):  # If the current spans more than 2.5 decades
+                    v1_filtered.append(v1[i])
+                    v2_filtered.append(v2[i])
                     i0_filtered.append(i0[i])
         if len(i0_filtered) == 0:  # Trying to return empty lists, since none of the sweeps span 2.5 decades
             raise IndexError
-        if ia is not None:
+        if ia is not None:  # Exposure -> return all four lists
             return v1_filtered, v2_filtered, i0_filtered, ia_filtered
-        return v1_filtered, v2_filtered, i0_filtered
-    else:  # Called from a transient measurement, only V1 and i0 exist. TODO: Will this ever be called?!
+        return v1_filtered, v2_filtered, i0_filtered  # Not exposure -> don't return ia!
+    else:  # Called from a transient measurement, only v1 and i0 exist. TODO: Will this ever be called?!
         for i in range(len(i0)):
-            if max(i0[i]) / (10 ** threshold) > min(i0[i]):
-                v1_filtered.append(V1[i])
+            if max(i0[i]) / (10 ** threshold) > min(i0[i]):  # If the current spans more than 2.5 decades
+                v1_filtered.append(v1[i])
                 i0_filtered.append(i0[i])
-        if len(i0_filtered) == 0:
+        if len(i0_filtered) == 0:  # Trying to return an empty list, since the current doesn't span 2.5 decades
             raise IndexError
-        return v1_filtered, i0_filtered
+        return v1_filtered, i0_filtered  # Return the x- and y-axis values
 
 
 # def main():
