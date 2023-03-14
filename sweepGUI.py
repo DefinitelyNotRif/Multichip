@@ -88,7 +88,7 @@ def open_trans_selection():
     them on or off. The right frame allows activation of each of the transistors, as well as setting the names of the
     devices and transistors.
     When the user clicks "Confirm", the transistor states, names and device names are saved in their respective global
-    variables, as well as in data/transistor_data.csv.
+    variables, as well as in data/settings/transistor_data.csv.
     """
 
     def confirm_trans():
@@ -107,7 +107,7 @@ def open_trans_selection():
             towrite.append(trans_names[i])
         towrite.append(drain_smus)  # Add the drain SMU configuration
         towrite.append([s.get() for s in [stv_smu2, stv_smu3, stv_smu4]])  # And then the other SMUs
-        with open('data/transistor_data.csv', 'w', newline='') as f:  # Write it to the file
+        with open('data/settings/transistor_data.csv', 'w', newline='') as f:  # Write it to the file
             csv_writer = writer(f)
             csv_writer.writerows(towrite)
         # Close the window
@@ -600,7 +600,7 @@ def init_channels_tab():
     drp_smu3.grid(row=2, column=1, sticky="w", padx=10, ipadx=20)
     drp_smu4 = ttk.OptionMenu(tab_channels, stv_smu4, None, *smu_list, "(None)")
     drp_smu4.grid(row=3, column=1, sticky="w", padx=10, ipadx=20)
-    with open('data/transistor_data.csv', newline='') as f:  # Read the SMU configuration saved in the file
+    with open('data/settings/transistor_data.csv', newline='') as f:  # Read the SMU configuration saved in the file
         csv_reader = reader(f)
         temp_lst = list(csv_reader)
     stv_smu2.set(temp_lst[10][0])
@@ -781,7 +781,7 @@ def init_sweep_tab():
                       stv_name2.get(), stv_start2.get(), stv_stop2.get(), stv_step2.get(), stv_n2.get(), stv_comp2.get(),
                       split('\(|\)', stv_name3.get())[1], stv_const.get(), stv_const_comp.get(), stv_hold.get(),
                       stv_delay.get(), stv_var1.get(), stv_var2.get(), stv_var3.get()]
-            for i in params:  # Check that all the entryboxes are filled in
+            for i in params[1:]:  # Check that all the entryboxes are filled in
                 if i == '':
                     messagebox.showerror('', "Please fill out all the parameters (including the info on the left)!")
                     return
@@ -793,13 +793,16 @@ def init_sweep_tab():
                                              "points, Compliance, Constant variable value.")
                     return
             if not edit:  # Save
-                with open("data/configs_s.csv", newline='') as f:  # Check if the name already exists
+                if stv_savename.get() == '':
+                    messagebox.showerror('', "Please fill out the desired configuration name!")
+                    return
+                with open("data/settings/configs_s.csv", newline='') as f:  # Check if the name already exists
                     csv_reader = reader(f)
                     for row in list(csv_reader)[1:]:
                         if row[0] == stv_savename.get():
                             messagebox.showerror('', "Configuration name already exists!")
                             return
-                with open("data/configs_s.csv", "a+", newline='') as f:  # Write a new line with the params
+                with open("data/settings/configs_s.csv", "a+", newline='') as f:  # Write a new line with the params
                     csv_writer = writer(f)
                     csv_writer.writerow(params)
                 menu = drp_load["menu"]  # Add it to the menu
@@ -810,18 +813,18 @@ def init_sweep_tab():
                     menu.add_command(label=s, command=tk._setit(stv_loadname, s))
                 messagebox.showinfo('', 'Configuration saved. ')
             else:  # Edit
-                with open("data/configs_s.csv", newline='') as f:  # Get the existing configs
+                with open("data/settings/configs_s.csv", newline='') as f:  # Get the existing configs
                     csv_reader = reader(f)
                     loadouts = list(csv_reader)
-                same_name = [row[0] == stv_savename.get() for row in loadouts]  # True on the row we need to edit, False otherwise
-                if not any(same_name):  # Trying to edit a config that doesn't exist
-                    messagebox.showerror('', "Configuration name does not exist!")
-                    return
-                with open("data/configs_s.csv", "w", newline='') as f:
+                # same_name = [row[0] == stv_savename.get() for row in loadouts]  # True on the row we need to edit, False otherwise
+                # if not any(same_name):  # Trying to edit a config that doesn't exist
+                #     messagebox.showerror('', "Configuration name does not exist!")
+                #     return
+                with open("data/settings/configs_s.csv", "w", newline='') as f:
                     csv_writer = writer(f)
                     for row in loadouts:
-                        if row[0] == stv_savename.get():
-                            csv_writer.writerow(params)
+                        if row[0] == stv_loadname.get():
+                            csv_writer.writerow([stv_loadname.get(), *params[1:]])
                         else:
                             csv_writer.writerow(row)
                 messagebox.showinfo('', 'Configuration edited. ')
@@ -840,7 +843,7 @@ def init_sweep_tab():
         Loads the selected configuration into all the entryboxes.
         """
         global stv_name1, stv_name2, stv_name, param_list
-        with open("data/configs_s.csv", newline='') as f:
+        with open("data/settings/configs_s.csv", newline='') as f:
             csv_reader = reader(f)
             for row in list(csv_reader)[1:]:
                 if row[0] == stv_loadname.get():  # For the row that corresponds to the selected config:
@@ -916,10 +919,10 @@ def init_sweep_tab():
         if tk.messagebox.askyesno('', "Are you sure you want to delete this configuration?"):
             try:
                 del_id = stv_loadname.get()  # The name of the config to be deleted
-                with open("data/configs_s.csv", newline='') as f:  # Get the existing configs
+                with open("data/settings/configs_s.csv", newline='') as f:  # Get the existing configs
                     csv_reader = reader(f)
                     existing_data = list(csv_reader)
-                with open("data/configs_s.csv", "w", newline='') as f:   # Write them back, except for the one that will
+                with open("data/settings/configs_s.csv", "w", newline='') as f:   # Write them back, except for the one that will
                     csv_writer = writer(f)                              # be deleted
                     for row in existing_data:
                         if row[0] != del_id:
@@ -1781,6 +1784,16 @@ def init_sweep_tab():
             global inc_type
             inc_type = 'sweep'
 
+            # Save the configuration of the exposure parameters
+            with open("data/settings/config_e.csv", "w", newline='') as f:  # Rewrite the file
+                csv_writer = writer(f)
+                to_write = [stv_ex_i0.get(), stv_ex_ia.get(), inv_ex_type.get(),
+                            [s.get() for s in [*stvs_ex_tvars, *stvs_ex_tcomps]],
+                            [*[s.get() for s in [stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold]],
+                             inv_ex_limit.get()],
+                            [s.get() for s in [stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between]]]
+                csv_writer.writerows(to_write)
+
             window_exp.destroy()
 
             window_load, fig, lbl_progress, chk_linlog, stv_ex_linlog, chk_currents, btn_ex_end, btn_ex_abort, prb, ax,\
@@ -1851,6 +1864,21 @@ def init_sweep_tab():
             ent_ex_s_n["state"] = state_s
             ent_ex_s_between["state"] = state_s
 
+        def load_ex_config():
+            with open("data/settings/config_e.csv", newline='') as f:
+                csv_reader = reader(f)
+                loadout = list(csv_reader)
+            stv_ex_i0.set(loadout[0][0])
+            stv_ex_ia.set(loadout[0][1])
+            inv_ex_type.set(int(loadout[0][2]))
+            for i, s in enumerate([*stvs_ex_tvars, *stvs_ex_tcomps]):
+                s.set(loadout[1][i])
+            for i, s in enumerate([stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold]):
+                s.set(loadout[2][i])
+            inv_ex_limit.set(loadout[2][-1])
+            for i, s in enumerate([stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between]):
+                s.set(loadout[3][i])
+
         # The setup window function starts here (when the user clicks "Run exposure").
         global stv_name1, stv_name2, stv_name3
         # Check that all the required entryboxes are filled in
@@ -1898,8 +1926,8 @@ def init_sweep_tab():
 
         frm_ex_names.rowconfigure(0, weight=1)  # Contains the two current names and the "Run" button.
         frm_ex_names.columnconfigure([*range(5)], weight=1)
-        # stv_ex_i0, stv_ex_ia = tk.StringVar(), tk.StringVar()
-        stv_ex_i0, stv_ex_ia = tk.StringVar(value='i0'), tk.StringVar(value='ia')
+        stv_ex_i0, stv_ex_ia = tk.StringVar(), tk.StringVar()
+        # stv_ex_i0, stv_ex_ia = tk.StringVar(value='i0'), tk.StringVar(value='ia')
         ttk.Label(frm_ex_names, text="Initial current name: ").grid(row=0, column=0, sticky="e", padx=10)
         ent_ex_i0 = ttk.Entry(frm_ex_names, textvariable=stv_ex_i0, width=5)
         ent_ex_i0.grid(row=0, column=1, sticky="ew")
@@ -1914,10 +1942,10 @@ def init_sweep_tab():
         rdb_ex_transient = ttk.Radiobutton(frm_ex_transient, text="Transient measurement",
                                            variable=inv_ex_type, value=0, command=lambda: enable_ex_ents('t'))
         rdb_ex_transient.grid(row=0, column=0, columnspan=3, sticky="nw", padx=5)
-        stvs_ex_tvars = [tk.StringVar(value='0'), tk.StringVar(value='15'), tk.StringVar(value='.1')]
-        stvs_ex_tcomps = [tk.StringVar(value='1u'), tk.StringVar(value='1u'), tk.StringVar(value='10u')]
-        # stvs_ex_tvars = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
-        # stvs_ex_tcomps = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
+        # stvs_ex_tvars = [tk.StringVar(value='0'), tk.StringVar(value='15'), tk.StringVar(value='.1')]
+        # stvs_ex_tcomps = [tk.StringVar(value='1u'), tk.StringVar(value='1u'), tk.StringVar(value='10u')]
+        stvs_ex_tvars = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
+        stvs_ex_tcomps = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
         ents_ex_tvars = []
         ents_ex_tcomps = []
 
@@ -1929,10 +1957,10 @@ def init_sweep_tab():
             ents_ex_tcomps.append(ttk.Entry(frm_ex_transient, textvariable=stvs_ex_tcomps[i], width=5))
             ents_ex_tcomps[-1].grid(row=i + 2, column=3, sticky="ew", padx=5)
             ttk.Label(frm_ex_transient, text="v").grid(row=i + 2, column=4, sticky="w")
-        stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold = tk.StringVar(value='400m'), tk.StringVar(value='11'), \
-                                                             tk.StringVar(value='4.0'), tk.StringVar(value='.1')
-        # stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold = tk.StringVar(), tk.StringVar(), tk.StringVar(), \
-        #                                                      tk.StringVar()
+        # stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold = tk.StringVar(value='400m'), tk.StringVar(value='11'), \
+        #                                                      tk.StringVar(value='4.0'), tk.StringVar(value='.1')
+        stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold = tk.StringVar(), tk.StringVar(), tk.StringVar(), \
+                                                             tk.StringVar()
         ttk.Label(frm_ex_transient, text="Interval: ").grid(row=5, column=0, columnspan=2, sticky="w", padx=5)
         ttk.Label(frm_ex_transient, text="No. of samples: ").grid(row=6, column=0, columnspan=2, sticky="w", padx=5)
         ttk.Label(frm_ex_transient, text="Total sampling time: ").grid(row=7, column=0, columnspan=2, sticky="w", padx=5)
@@ -1963,11 +1991,11 @@ def init_sweep_tab():
         rdb_ex_sweep = ttk.Radiobutton(frm_ex_sweep, text="Periodic sweep measurement",
                                        variable=inv_ex_type, value=1, command=lambda: enable_ex_ents('s'))
         rdb_ex_sweep.grid(row=0, column=0, columnspan=5, sticky="nw", padx=5)
-        # stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between = tk.StringVar(), tk.StringVar(), tk.StringVar(), \
-        #                                                                tk.StringVar()
-        stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between = tk.StringVar(value='25'), \
-                                                                       tk.StringVar(value='1u'), tk.StringVar(value=4), \
-                                                                       tk.StringVar(value='3')
+        stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between = tk.StringVar(), tk.StringVar(), tk.StringVar(), \
+                                                                       tk.StringVar()
+        # stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between = tk.StringVar(value='25'), \
+        #                                                                tk.StringVar(value='1u'), tk.StringVar(value=4), \
+        #                                                                tk.StringVar(value='3')
         ttk.Label(frm_ex_sweep, text=params[1] + ": ").grid(row=1, column=0, padx=5)
         ent_ex_s_var2 = ttk.Entry(frm_ex_sweep, textvariable=stv_ex_sweepvar, width=5, state=tk.DISABLED)  # The VALUE of the var
         ent_ex_s_var2.grid(row=1, column=1, sticky="nsew", padx=5)
@@ -1985,6 +2013,9 @@ def init_sweep_tab():
         ex_sweep_notification = "The parameters of the sweep (on " + params[0] + "), the \nconstant variable (" + \
                                 params[1] + "), and the timing \n(hold, delay) will be taken from the main window. "
         ttk.Label(frm_ex_sweep, text=ex_sweep_notification).grid(row=4, column=0, columnspan=5, padx=5, pady=10)
+
+        # Load the last run configuration from the file
+        load_ex_config()
 
         def update_ex_time_params(var, t):
             """
@@ -2221,7 +2252,7 @@ def init_sweep_tab():
     ttk.Label(frm_consts, text="sec").grid(row=1, column=5, padx=5, sticky="w")
 
     # Save/Load frame
-    with open("data/configs_s.csv", newline='') as f:
+    with open("data/settings/configs_s.csv", newline='') as f:
         csv_reader = reader(f)
         config_names = [row[0] for row in list(csv_reader)[1:]]  # Read the name of each config to config_names
 
@@ -2568,14 +2599,14 @@ def init_time_tab():
         :param edit: False to add a new row, True to overwrite an existing row.
         """
         try:
-            params = [s.get() for s in [stv_t_savename, stv_op, stv_gas, stv_conc, stv_carr, stv_atm, stv_dec, stv_thick,
+            params = [s.get() for s in [stv_op, stv_gas, stv_conc, stv_carr, stv_atm, stv_dec, stv_thick,
                                         stv_temp, stv_hum, *stvs_tvars, *stvs_tcomps, stv_int, stv_n, stv_tot,
                                         stv_hold, stv_linlog]]
             for i in params:  # Check that all the entryboxes are filled in
                 if i == '':
                     messagebox.showerror('', "Please fill out all the parameters (including the info on the left)!")
                     return
-            for i in params[10:20]:  # Check that the relevant values are numeric
+            for i in params[9:19]:  # Check that the relevant values are numeric
                 try:
                     suffix(i)
                 except ValueError:
@@ -2583,17 +2614,20 @@ def init_time_tab():
                                              "points, Compliance, Constant variable value.")
                     return
             str_limit = "True" if inv_limit_time.get() == 1 else "False"
-            save_params = [*params[:16], params[-1], *params[16:20], str_limit, *param_list]
+            save_params = [*params[:15], params[-1], *params[15:19], str_limit, *param_list]
             if not edit:  # Save
-                with open("data/configs_t.csv", newline='') as f:  # Check if the name already exists
+                if stv_t_savename.get() == '':
+                    messagebox.showerror('', "Please fill out the desired configuration name!")
+                    return
+                with open("data/settings/configs_t.csv", newline='') as f:  # Check if the name already exists
                     csv_reader = reader(f)
                     for row in list(csv_reader)[1:]:
                         if row[0] == stv_t_savename.get():
                             messagebox.showerror('', "Configuration name already exists!")
                             return
-                with open("data/configs_t.csv", "a+", newline='') as f:  # Write a new line with the params
+                with open("data/settings/configs_t.csv", "a+", newline='') as f:  # Write a new line with the params
                     csv_writer = writer(f)
-                    csv_writer.writerow(save_params)
+                    csv_writer.writerow([stv_t_savename.get(), *save_params])
                 menu = drp_load["menu"]  # Add it to the menu
                 options = [menu.entrycget(i, "label") for i in range(menu.index("end") + 1)]
                 options.append(params[0])  # Clear the dropmenu and re-add the options including the new one
@@ -2602,18 +2636,14 @@ def init_time_tab():
                     menu.add_command(label=s, command=tk._setit(stv_t_loadname, s))
                 messagebox.showinfo('', 'Configuration saved. ')
             else:  # Edit
-                with open("data/configs_t.csv", newline='') as f:  # Get the existing configs
+                with open("data/settings/configs_t.csv", newline='') as f:  # Get the existing configs
                     csv_reader = reader(f)
                     loadouts = list(csv_reader)
-                same_name = [row[0] == stv_t_savename.get() for row in loadouts]  # True on the row we need to edit, False otherwise
-                if not any(same_name):  # Trying to edit a config that doesn't exist
-                    messagebox.showerror('', "Configuration name does not exist!")
-                    return
-                with open("data/configs_t.csv", "w", newline='') as f:
+                with open("data/settings/configs_t.csv", "w", newline='') as f:
                     csv_writer = writer(f)
                     for row in loadouts:
-                        if row[0] == stv_t_savename.get():
-                            csv_writer.writerow(save_params)
+                        if row[0] == stv_t_loadname.get():
+                            csv_writer.writerow([stv_t_loadname.get(), *save_params])
                         else:
                             csv_writer.writerow(row)
                 messagebox.showinfo('', 'Configuration edited. ')
@@ -2632,7 +2662,7 @@ def init_time_tab():
         Loads the selected configuration into all the entryboxes.
         """
         global stv_name1, stv_name2, stv_name3, param_list
-        with open("data/configs_t.csv", newline='') as f:
+        with open("data/settings/configs_t.csv", newline='') as f:
             csv_reader = reader(f)
             for row in list(csv_reader)[1:]:
                 if row[0] == stv_t_loadname.get():  # For the row that corresponds to the selected config:
@@ -2687,6 +2717,9 @@ def init_time_tab():
                     global lbls_tnames
                     for i in range(3):
                         lbls_tnames[i]["text"] = "v({}): ".format(param_list[i])
+
+                    # Finally, set the warning labels accordingly
+                    set_warning()
                     return
 
     def delete_t_config():
@@ -2696,10 +2729,10 @@ def init_time_tab():
         if tk.messagebox.askyesno('', "Are you sure you want to delete this configuration?"):
             try:
                 del_id = stv_t_loadname.get()  # The name of the config to be deleted
-                with open("data/configs_t.csv", newline='') as f:  # Get the existing configs
+                with open("data/settings/configs_t.csv", newline='') as f:  # Get the existing configs
                     csv_reader = reader(f)
                     existing_data = list(csv_reader)
-                with open("data/configs_t.csv", "w", newline='') as f:   # Write them back, except for the one that will
+                with open("data/settings/configs_t.csv", "w", newline='') as f:   # Write them back, except for the one that will
                     csv_writer = writer(f)                              # be deleted
                     for row in existing_data:
                         if row[0] != del_id:
@@ -2723,8 +2756,16 @@ def init_time_tab():
                 return
 
     def set_warning():
-        if inv_limit_time.get() == 1:
-            pass  # TODO
+        """
+        Shows or hides the warning label, depending on whether the "Limit run time" option is selected.
+        """
+        if inv_limit_time.get() == 1:  # Limit run time -> no need to show the warning
+            lbl_warning1.config(text='')
+            lbl_warning2.config(text='\n')  # The break keeps the label's height the same, so that the other elements
+            # won't move around as a result
+        else:  # Don't limit run time -> show the warning
+            lbl_warning1.config(text="WARNING: ")
+            lbl_warning2.config(text="Actual interval and total time \nwill be much longer!")
 
     tab_time.rowconfigure(0, weight=1)
     tab_time.columnconfigure(2, weight=1)
@@ -2827,12 +2868,13 @@ def init_time_tab():
     ent_tot.bind("<FocusOut>", lambda e: update_time_params(stv_tot, 'tot'))
     ent_hold = ttk.Entry(frm_params, textvariable=stv_hold)
     ent_hold.grid(row=5, column=1)
-    ttk.Label(frm_params, text="WARNING: ", foreground="red").grid(row=6, column=0, sticky="ne")
-    lbl_warning = ttk.Label(frm_params, text="Actual interval and total time \nwill be much longer!")
-    lbl_warning.grid(row=6, column=1, columnspan=2, sticky="nw")
-    inv_limit_time = tk.IntVar(value=1)
+    lbl_warning1 = ttk.Label(frm_params, text="WARNING: ", foreground="red")
+    lbl_warning1.grid(row=6, column=0, sticky="ne")
+    lbl_warning2 = ttk.Label(frm_params, text="Actual interval and total time \nwill be much longer!")
+    lbl_warning2.grid(row=6, column=1, columnspan=2, sticky="nw")
+    inv_limit_time = tk.IntVar(value=0)
     chk_limit_time = ttk.Checkbutton(frm_params, text="Limit run time to the set value", variable=inv_limit_time,
-                                     onvalue=1, offvalue=0)
+                                     onvalue=1, offvalue=0, command=set_warning)
     chk_limit_time.grid(row=7, column=0, columnspan=3, padx=10, sticky="nsw")
     btn_select_trans = ttk.Button(frm_params, text="Select transistors", command=lambda: open_trans_selection())
     btn_select_trans.grid(row=8, column=0, padx=20, pady=10, sticky="nsew")
@@ -2843,7 +2885,7 @@ def init_time_tab():
     ttk.Label(frm_params, text=" sec").grid(row=5, column=2, padx=5, sticky="w")
 
     # Save/Load frame
-    with open("data/configs_t.csv", newline='') as f:
+    with open("data/settings/configs_t.csv", newline='') as f:
         csv_reader = reader(f)
         config_t_names = [row[0] for row in list(csv_reader)[1:]]  # Read the name of each config to config_names
 
@@ -3204,7 +3246,7 @@ def init_analysis_tab():
         btn_it["state"] = state_t
         btn_t_ioffon["state"] = state_t
         btn_t_risefall["state"] = state_t
-        btn_t_fit["state"] = tk.DISABLED  # Temporarily
+        # btn_t_fit["state"] = tk.DISABLED
 
     def delete_experiment():
         """
@@ -3396,7 +3438,7 @@ def init_analysis_tab():
     tab_a_transient = ttk.Frame(analysis_tabs)
     analysis_tabs.add(tab_a_transient, text="Transient")
     tab_a_transient.rowconfigure(0, weight=1)
-    tab_a_transient.columnconfigure([*range(4)], weight=1)
+    tab_a_transient.columnconfigure([*range(3)], weight=1)
     btn_it = ttk.Button(tab_a_transient, text="Plot i-t", command=lambda: show_it(), state=tk.DISABLED)
     btn_it.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
     btn_t_ioffon = ttk.Button(tab_a_transient, text="Show Ioff&Ion", command=lambda: show_t_ioffon(), state=tk.DISABLED)
@@ -3404,9 +3446,8 @@ def init_analysis_tab():
     btn_t_risefall = ttk.Button(tab_a_transient, text="Show rise/fall time", command=lambda: show_t_risefall(),
                                 state=tk.DISABLED)
     btn_t_risefall.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
-    btn_t_fit = ttk.Button(tab_a_transient, text="Fit i-t curve", command=lambda: show_t_fit(), state=tk.DISABLED)
-    btn_t_fit.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
-
+    # btn_t_fit = ttk.Button(tab_a_transient, text="Fit I-t curve", command=lambda: show_t_fit(), state=tk.DISABLED)
+    # btn_t_fit.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
 
     def load_data():
         """
@@ -3777,7 +3818,7 @@ def init_settings_tab():
 
     def save_preferences():
         new_prefs = [s.get() for s in [stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion]]
-        with open('data/preferences.csv', 'w', newline='') as f:
+        with open('data/settings/preferences.csv', 'w', newline='') as f:
             csv_writer = writer(f)
             csv_writer.writerows([[row] for row in new_prefs])  # TODO: Edge cases; Confirmation; Check empties.
         messagebox.showinfo('', 'Preferences saved.')
@@ -3923,9 +3964,10 @@ def init_settings_tab():
     btn_save_prefs.grid(row=6, column=0, columnspan=5, sticky="nsw", padx=20, pady=5, ipadx=10)
 
     # Load preferences
-    with open('data/preferences.csv', 'r', newline='') as f:
+    with open('data/settings/preferences.csv', 'r', newline='') as f:
         csv_reader = reader(f)
         preferences = list(csv_reader)
+    # Set the required StringVars to the read values
     for s, p in zip([stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion], preferences):
         s.set(p[0])
 
@@ -3965,7 +4007,7 @@ try:
         tk.StringVar(), tk.StringVar(), tk.StringVar()
     # Used to include stv_dev too.
     global stv_smu2, stv_smu3, stv_smu4
-    with open('data/transistor_data.csv', newline='') as f:
+    with open('data/settings/transistor_data.csv', newline='') as f:
         csv_reader = reader(f)
         temp_trans_data = list(csv_reader)
         for i in range(4):
