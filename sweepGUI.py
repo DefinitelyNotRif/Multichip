@@ -611,9 +611,10 @@ def rewrite_prefs(f):
             with open('data/settings/preferences.csv', 'w', newline='') as f:
                 csv_writer = writer(f)
                 csv_writer.writerows([['1'], ['Constant'], ['1n'], ['30'], ['10n']])
-                csv_writer.writerow(["(0, 0, 1)", "(1, 0, 1)",
-                                     "(0.17254901960784313, 0.6274509803921569, 0.17254901960784313)",
+                csv_writer.writerow(["(0, 0, 1)",
                                      "(0.8392156862745098, 0.15294117647058825, 0.1568627450980392)",
+                                     "(0.17254901960784313, 0.6274509803921569, 0.17254901960784313)",
+                                     "(1, 0.5, 0)",
                                      "(0.09019607843137255, 0.7450980392156863, 0.8117647058823529)"])
         case 'd':
             with open('data/settings/transistor_data.csv', 'w', newline='') as f:
@@ -631,7 +632,6 @@ def rewrite_prefs(f):
 def safe_quit():  # To prevent the program from running after the window is closed...
     window.quit()
     window.destroy()
-    quit()
 
 
 def init_channels_tab():
@@ -2275,6 +2275,9 @@ def init_sweep_tab():
     if not spa_connected and not suppress_errors:
         btn_char["state"] = tk.DISABLED
         btn_run["state"] = tk.DISABLED
+    global board
+    if not board:
+        btn_select_trans["state"] = tk.DISABLED
 
     # Parameter entry frame
     global stv_name1, stv_name2, stv_name3, param_list
@@ -3041,6 +3044,11 @@ def init_time_tab():
     ttk.Label(frm_params, text=" sec").grid(row=2, column=2, padx=5, sticky="w")
     ttk.Label(frm_params, text=" sec").grid(row=4, column=2, padx=5, sticky="w")
     ttk.Label(frm_params, text=" sec").grid(row=5, column=2, padx=5, sticky="w")
+    if not spa_connected and not suppress_errors:
+        btn_run_time["state"] = tk.DISABLED
+    global board
+    if not board:
+        btn_select_trans["state"] = tk.DISABLED
 
     # Save/Load frame
     with open("data/settings/configs_t.csv", newline='') as f:
@@ -4051,9 +4059,9 @@ def init_settings_tab():
         global drain_colors, color_d1, color_d2, color_g1, color_g2, color_src
         drain_colors.clear()
         color_d1 = (0, 0, 1)
-        color_d2 = (1, 0, 1)
+        color_d2 = (214 / 255, 39 / 255, 40 / 255)
         color_g1 = (44 / 255, 160 / 255, 44 / 255)
-        color_g2 = (214 / 255, 39 / 255, 40 / 255)
+        color_g2 = (1, 0.5, 0)
         color_src = (23 / 255, 190 / 255, 207 / 255)
         clr_d1["background"] = to_hex(color_d1)
         clr_d2["background"] = to_hex(color_d2)
