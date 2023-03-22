@@ -49,7 +49,8 @@ class TkExceptionHandler:  # i don't know what this does, but apparently it's cr
 
 tk.CallWrapper = TkExceptionHandler
 
-logging.basicConfig(filename="logs.log", level=logging.ERROR, format='%(asctime)s %(levelname)s: %(message)s')  # Set the format to use in logs.txt
+logging.basicConfig(filename="logs.log", level=logging.ERROR, format='%(asctime)s %(levelname)s: %(message)s',
+                    datefmt='%m/%d/%Y %H:%M:%S')  # Set the format to use in logs.txt
 param_list = ["d", "jg", "bg"]  # The parameters for the sweeps (drain first).
 drain_smus = []  # Lists the SMUs connected to the drains (e.g. ["SMU2", ...]).
 device_names = ['' for i in range(4)]  # Lists the names of each of the (up to) four devices.
@@ -62,9 +63,12 @@ meas_type = ''  # 'char'/'exposure'/'transient'. Determines the type of the last
 vth_funcs = ['Constant', 'Linear extrapolation']
 measurement_vars.stop_ex = False  # This is explained in open_measurement_window()
 current_id = -1  # The highest ID out of the existing experiments. Is the global definition even necessary?!
-version = '0.4.3'
+version = '1,0'
 err_msg = ''  # Error message for when the SPA isn't connected or services aren't running
-suppress_errors = True  # If True, doesn't show errors if the SPA/Arduino aren't connected. For debugging purposes.
+suppress_errors = False  # If True, doesn't show errors if the SPA/Arduino aren't connected. For debugging purposes.
+msg_on_init = False  # Becomes True if a messagebox appears while initializing the window. In this case, let
+# hacky_no_spa_1() wait.
+meas_prim, meas_sec, meas_i0, meas_ia = [], [], [], []
 
 
 def reset_spa():
@@ -272,32 +276,37 @@ def update_table(t):
     :param t: The table to be updated. For some reason, i couldn't just use the table as a global variable...
     """
     if control_tabs.tab(control_tabs.select(), "text") == "Analysis":  # Only update the table if you're going to see it
-        with open("data/central.csv", newline='') as f:  # Get the new experiment list
-            csv_reader = reader(f)
-            existing_data = list(csv_reader)
-        t.delete(*t.get_children())  # Reset the table
-        t["column"] = [*existing_data[0][0:2], "Experiment type", *existing_data[0][2:]]  # Prepare headers
-        t["show"] = "headings"
-        widths = [44, 79, 115, 63, 39, 120, 58, 83, 111, 69, 76, 98, 100, 70, 0, 176]  # Prepare widths
-        for col in t["column"]:  # Set the headers
-            t.heading(col, text=col)
-        for i in range(len(t["columns"])):  # Set column widths
-            t.column(t["columns"][i], width=widths[i], stretch=False)
-        # The experiment type and variable order are determined by the abbreviation (e.g. 'JBD'), but there still
-        # needs to be a readable representation of the experiment type for the user. Therefore:
-        for row in existing_data[1:]:  # Determine the experiment type from the abbreviation saved in the file
-            extype = 'Other'  # Not supposed to stay like this.
-            abbr = row[-2]
-            if len(abbr) == 1:
-                extype = 'Transient'
-            elif len(abbr) == 3:
-                extype = 'Exposure'
-            else:
-                if abbr[0] == 'C':
-                    extype = 'Characteristic'
-                elif abbr[0] == 'T':
-                    extype = 'Periodic sweep'
-            t.insert("", "end", values=[*row[:2], extype, *row[2:]])
+        try:
+            with open("data/central.csv", newline='') as f:  # Get the new experiment list
+                csv_reader = reader(f)
+                existing_data = list(csv_reader)
+            t.delete(*t.get_children())  # Reset the table
+            t["column"] = [*existing_data[0][0:2], "Experiment type", *existing_data[0][2:]]  # Prepare headers
+            t["show"] = "headings"
+            widths = [44, 79, 115, 63, 39, 120, 58, 83, 111, 69, 76, 98, 100, 70, 0, 176]  # Prepare widths
+            for col in t["column"]:  # Set the headers
+                t.heading(col, text=col)
+            for i in range(len(t["columns"])):  # Set column widths
+                t.column(t["columns"][i], width=widths[i], stretch=False)
+            # The experiment type and variable order are determined by the abbreviation (e.g. 'JBD'), but there still
+            # needs to be a readable representation of the experiment type for the user. Therefore:
+            for row in existing_data[1:]:  # Determine the experiment type from the abbreviation saved in the file
+                extype = 'Other'  # Not supposed to stay like this.
+                abbr = row[-2]
+                if len(abbr) == 1:
+                    extype = 'Transient'
+                elif len(abbr) == 3:
+                    extype = 'Exposure'
+                else:
+                    if abbr[0] == 'C':
+                        extype = 'Characteristic'
+                    elif abbr[0] == 'T':
+                        extype = 'Periodic sweep'
+                t.insert("", "end", values=[*row[:2], extype, *row[2:]])
+        except IndexError:
+            messagebox.showerror('', 'Something went wrong while reading the experiment information file '
+                                     '(data/central.csv). Please make sure that all of the columns are filled, and '
+                                     'then reopen the program. ')
 
 
 def extract_var_letter(s):
@@ -387,14 +396,18 @@ def hacky_no_spa_1(w):
     :param w:
     :return:
     """
+    global msg_on_init
     time.sleep(0.5)
+    while msg_on_init:
+        time.sleep(0.1)
     w.event_generate("<<no-spa>>", when="tail")
 
 
 def hacky_no_spa_2():
     if not suppress_errors:
+        window.update_idletasks()  # To fix a focus error
         messagebox.showerror('SPA not connected', err_msg)
-    pass
+    window.update_idletasks()
 
 
 def get_service(name):
@@ -487,9 +500,9 @@ def open_measurement_window(p_prim, stv_linlog1, is_transient=False, for_testing
         ax.set_xlim([p_prim[1], p_prim[2]])
     if stv_linlog1.get() == 'Logarithmic':
         ax.set_yscale('log')
-        ax2.set_yscale('log')
-        ax3.set_yscale('log')
-        ax4.set_yscale('log')
+        # ax2.set_yscale('log')
+        # ax3.set_yscale('log')
+        # ax4.set_yscale('log')
     # The additional currents are initially hidden
     ax2.set_visible(False)
     ax3.set_visible(False)
@@ -532,9 +545,93 @@ def open_measurement_window(p_prim, stv_linlog1, is_transient=False, for_testing
                ax, ax2, ax3, ax4, bar  # These objects will be referred to at runtime
 
 
+def rewrite_prefs(f):
+    """
+    If the user attempts to load information from a file (configuration/preferences), but its structure is invalid -
+    that is, it doesn't have enough rows, or a certain row doesn't have enough values - the user is prompted to reset
+    the offending file to its default values (in the case of the configuration files, this means removing all existing
+    configurations).
+    :param f: The file from which the funciton was called. Can be 's', 't', 'e', 'p', or 'd'; Corresponding to the sweep
+    config, transient config, exposure config, preferences, and transistor data files respectively.
+    """
+    window.update_idletasks()  # To fix a focus error
+    global msg_on_init
+    msg_on_init = True
+    match f:  # Determine the message to be displayed
+        case 's':
+            msg_1 = 'sweep configuration'
+        case 't':
+            msg_1 = 'transient configuration'
+        case 'e':
+            msg_1 = 'exposure experiment configuration'
+        case 'p':
+            msg_1 = 'preferences'
+        case 'd':
+            msg_1 = 'transistor data'
+    msg_2 = 'rewrite it to the default values?' if f == 'p' or f == 'd'\
+        else 'remove the exisitng configuration?' if f == 'e' else 'remove all existing configurations?'
+    if not messagebox.askyesno('', f'The {msg_1} file has an invalid structure. {msg_2.capitalize()}'):  # If the user
+        # doesn't want to rewrite the file, don't do anything.
+        if f == 'p' or f == 'd':  # However, these files cannot be allowed to be invalid!
+            messagebox.showinfo('', f'The program cannot run with an invalid {msg_1} file. Please fix it and try '
+                                    f'again. ')
+            safe_quit()
+        msg_on_init = False
+        return
+    elif not messagebox.askyesno('', f'Are you sure you want to {msg_2}'):  # Juuust to be sure
+        if f == 'p' or f == 'd':
+            messagebox.showinfo('', f'The program cannot run with an invalid {msg_1} file. Please fix it and try '
+                                    f'again. ')
+            safe_quit()
+        msg_on_init = False
+        return
+    match f:
+        case 's':
+            with open('data/settings/configs_s.csv', 'w', newline='') as f:
+                csv_writer = writer(f)
+                csv_writer.writerow(['Config. name', 'Operator', 'Gas', 'Conc', 'Carrier', 'Atmosphere', 'Decoration',
+                                     'Thickness', 'Temperature', 'Humidity', 'Primary', 'Yscale', 'Start1', 'Stop1',
+                                     'Step1', 'N1', 'Comp1', 'Secondary', 'Start2', 'Stop2', 'Step2', 'N2', 'Comp2',
+                                     'Constname', 'Const', 'Compconst', 'Hold', 'Delay', 'Drain Var', 'Var2', 'Var3'])
+        case 't':
+            with open('data/settings/configs_t.csv', 'w', newline='') as f:
+                csv_writer = writer(f)
+                csv_writer.writerow(['Config. name', 'Operator', 'Gas', 'Conc', 'Carrier', 'Atmosphere', 'Decoration',
+                                     'Thickness', 'Temperature', 'Humidity', 'V1', 'V2', 'V3', 'C1', 'C2', 'C3',
+                                     'Yscale', 'Interval', 'No. of samples', 'Total', 'Hold', 'Limit', 'Drain var',
+                                     'Var2', 'Var3'])
+        case 'e':
+            with open('data/settings/config_e.csv', 'w', newline='') as f:
+                csv_writer = writer(f)
+                csv_writer.writerows([['', '', '0', '', '', ''],
+                                     ['', '', '', '', '', ''],
+                                      ['', '', '', '', '0', ''],
+                                      ['', '', '', '', '', '']])
+        case 'p':
+            with open('data/settings/preferences.csv', 'w', newline='') as f:
+                csv_writer = writer(f)
+                csv_writer.writerows([['1'], ['Constant'], ['1n'], ['30'], ['10n']])
+                csv_writer.writerow(["(0, 0, 1)", "(1, 0, 1)",
+                                     "(0.17254901960784313, 0.6274509803921569, 0.17254901960784313)",
+                                     "(0.8392156862745098, 0.15294117647058825, 0.1568627450980392)",
+                                     "(0.09019607843137255, 0.7450980392156863, 0.8117647058823529)"])
+        case 'd':
+            with open('data/settings/transistor_data.csv', 'w', newline='') as f:
+                csv_writer = writer(f)
+                csv_writer.writerows([['False' for i in range(4)] for j in range(4)])  # active_trans
+                csv_writer.writerow([f'dev{i+1}' for i in range(4)])  # device_names
+                csv_writer.writerows([[f'd{i+1}t{j+1}' for j in range(4)] for i in range(4)])  # trans_names
+                csv_writer.writerow([f'SMU{i+1}' for i in range(4)])  # drain_smus
+                csv_writer.writerow(['SMU5', 'SMU6', '(None)'])  # Other SMUs
+    # Finally, close the window.
+    messagebox.showinfo('', 'File reset. Please reopen the program. ')
+    safe_quit()
+
+
 def safe_quit():  # To prevent the program from running after the window is closed...
     window.quit()
     window.destroy()
+    quit()
 
 
 def init_channels_tab():
@@ -577,6 +674,11 @@ def init_channels_tab():
         smu_list = list(b1500.smu_names.values())  # "SMU1", "SMU2", etc
     else:
         smu_list = ["SMU1", "SMU2", "SMU3", "SMU4", "SMU5", "SMU6"]  # Just a placeholder.
+    if len(smu_list) < 3:
+        global msg_on_init
+        msg_on_init = True
+        messagebox.showerror('', 'Please ensure that at least three SMUs are connected!')
+        safe_quit()
     ttk.Label(tab_channels, text="Drain SMUs: ").grid(row=0, column=0, sticky="nse")
     ttk.Label(tab_channels, text="Gate SMUs: ").grid(row=1, column=0, sticky="nse")
     ttk.Label(tab_channels, text="Ground SMU: ").grid(row=3, column=0, sticky="nse")
@@ -601,11 +703,15 @@ def init_channels_tab():
     drp_smu4 = ttk.OptionMenu(tab_channels, stv_smu4, None, *smu_list, "(None)")
     drp_smu4.grid(row=3, column=1, sticky="w", padx=10, ipadx=20)
     with open('data/settings/transistor_data.csv', newline='') as f:  # Read the SMU configuration saved in the file
+        # TODO: What if there are less than 3 SMUs?
         csv_reader = reader(f)
         temp_lst = list(csv_reader)
-    stv_smu2.set(temp_lst[10][0])
-    stv_smu3.set(temp_lst[10][1])
-    stv_smu4.set(temp_lst[10][2])
+    for s in [*temp_lst[-2], *temp_lst[-1]]:  # Validation
+        if not (s == '(None)' or s[:-1] == 'SMU'):
+            rewrite_prefs('d')
+    stv_smu2.set(temp_lst[-1][0])
+    stv_smu3.set(temp_lst[-1][1])
+    stv_smu4.set(temp_lst[-1][2])
 
     ttk.Label(tab_channels, text="Variable name: ").grid(row=0, column=2, sticky="nse")
     ttk.Label(tab_channels, text="Variable name: ").grid(row=1, column=2, sticky="nse")
@@ -816,10 +922,6 @@ def init_sweep_tab():
                 with open("data/settings/configs_s.csv", newline='') as f:  # Get the existing configs
                     csv_reader = reader(f)
                     loadouts = list(csv_reader)
-                # same_name = [row[0] == stv_savename.get() for row in loadouts]  # True on the row we need to edit, False otherwise
-                # if not any(same_name):  # Trying to edit a config that doesn't exist
-                #     messagebox.showerror('', "Configuration name does not exist!")
-                #     return
                 with open("data/settings/configs_s.csv", "w", newline='') as f:
                     csv_writer = writer(f)
                     for row in loadouts:
@@ -980,10 +1082,8 @@ def init_sweep_tab():
             """
             global drain_colors, color_g1, color_g2, color_src
             v1, v2, i = tuple(measurement_vars.send_sweep)
-            print(measurement_vars.send_sweep)
             secondary_col = -3 if show_src else -2
             y1 = i[:secondary_col]  # Only the drains
-            print(y1)
             y2 = i[secondary_col]  # Gate 1
             y3 = i[secondary_col+1]  # Gate 2
             if show_src:
@@ -1002,14 +1102,14 @@ def init_sweep_tab():
             """
             if chk_linlog.instate(['selected']):
                 ax.set_yscale('log')
-                ax2.set_yscale('log')
-                ax3.set_yscale('log')
-                ax4.set_yscale('log')
+                # ax2.set_yscale('log')
+                # ax3.set_yscale('log')
+                # ax4.set_yscale('log')
             else:
                 ax.set_yscale('linear')
-                ax2.set_yscale('linear')
-                ax3.set_yscale('linear')
-                ax4.set_yscale('linear')
+                # ax2.set_yscale('linear')
+                # ax3.set_yscale('linear')
+                # ax4.set_yscale('linear')
             bar.draw()
 
         def additional_currents():
@@ -1183,6 +1283,7 @@ def init_sweep_tab():
         ax2.set_ylabel("I ({})".format(param_list[1]))
         ax3.set_ylabel("I ({})".format(param_list[2]))
         ax4.set_ylabel("I (Source)")
+        ax.set_xlabel("V({})".format(p_prim[0]))
         # If the source SMU wasn't set, hide the axis (and don't add its sweeps)
         show_src = stv_smu4.get() != "(None)"
         ax4.set_visible(show_src)
@@ -1233,21 +1334,28 @@ def init_sweep_tab():
                 Increments the progressbar and updates the progress label.
                 The progress label's text depends on the measurement type (see inc_type).
                 :param: val: The portion of the progressbar that should be full (between 0 and 1).
-                :param: v: The value (voltage) of the secondary variable in the current sweep.
-                :param: after: Whether the progress update is right before or right after performing a sweep, just for the
-                                progress label.
+                :param: v: The value (voltage) of the secondary variable in the current sweep of the characteristic, or
+                the current iteration of the periodic sweep.
+                :param: devid: The index of the device that is currently being measured (0-3). If it's 4, display the
+                initialization message; And if it's 5, display the "measurement complete" message.
                 :param: inc_type: Whether the current measurement is a sweep (either a characteristic or a periodic
                 sweep), or a transient measurement.
                 """
                 global inc_type
                 if inc_type == 'sweep':
                     val, v, devid = tuple(measurement_vars.incr_vars)
+                    global mid_meas
+                    if mid_meas:  # Determine the text to show in the parentheses - either the secondary
+                        # voltage or the interation number.
+                        sec_text = f'iteration {v}'
+                    else:
+                        sec_text = f'{p_sec[0]}={strf(v)}v'
                     if devid == 4:
                         lbl_progress["text"] = "Initializing..."
                     elif devid == 5:
-                        lbl_progress["text"] = f"Measurement complete ({p_sec[0]}={strf(v)}v)."
+                        lbl_progress["text"] = f"Measurement complete ({sec_text})."
                     else:
-                        lbl_progress["text"] = f"Measuring ({device_names[devid]})..."
+                        lbl_progress["text"] = f"Measuring ({device_names[devid]}, {sec_text})..."
                     prb["value"] = val * 100
                     if val == 1:
                         btn_ex_end["state"] = tk.NORMAL
@@ -1314,9 +1422,9 @@ def init_sweep_tab():
                 if show_src:
                     ax4.plot(x, y4, color=color_src)
                 ax.set_yscale(s)
-                ax2.set_yscale(s)
-                ax3.set_yscale(s)
-                ax4.set_yscale(s)
+                # ax2.set_yscale(s)
+                # ax3.set_yscale(s)
+                # ax4.set_yscale(s)
                 if chk_currents.instate(['selected']):  # Re-resize the plot and reposition the right axes
                     # fig.subplots_adjust(right=0.65)
                     ax3.spines.right.set_position(("axes", 1.2))
@@ -1328,6 +1436,21 @@ def init_sweep_tab():
                 ax3.set_ylabel("I ({})".format(param_list[2]))
                 ax4.set_ylabel("I (Source)")
                 ax.set_xlabel("t (sec)")
+                ax2.yaxis.set_label_position("right")
+                ax3.yaxis.set_label_position("right")
+                ax4.yaxis.set_label_position("right")
+                ax.spines["left"].set_edgecolor(color_d1)
+                ax2.spines["right"].set_edgecolor(color_g1)
+                ax3.spines["right"].set_edgecolor(color_g2)
+                ax4.spines["right"].set_edgecolor(color_src)
+                ax.tick_params(axis='y', colors=color_d1)
+                ax2.tick_params(axis='y', colors=color_g1)
+                ax3.tick_params(axis='y', colors=color_g2)
+                ax4.tick_params(axis='y', colors=color_src)
+                ax.yaxis.label.set_color(color_d1)
+                ax2.yaxis.label.set_color(color_g1)
+                ax3.yaxis.label.set_color(color_g2)
+                ax4.yaxis.label.set_color(color_src)
                 bar.draw()
 
             def linlog():
@@ -1336,14 +1459,14 @@ def init_sweep_tab():
                 """
                 if chk_linlog.instate(['selected']):
                     ax.set_yscale('log')
-                    ax2.set_yscale('log')
-                    ax3.set_yscale('log')
-                    ax4.set_yscale('log')
+                    # ax2.set_yscale('log')
+                    # ax3.set_yscale('log')
+                    # ax4.set_yscale('log')
                 else:
                     ax.set_yscale('linear')
-                    ax2.set_yscale('linear')
-                    ax3.set_yscale('linear')
-                    ax4.set_yscale('linear')
+                    # ax2.set_yscale('linear')
+                    # ax3.set_yscale('linear')
+                    # ax4.set_yscale('linear')
                 bar.draw()
 
             def additional_currents():
@@ -1389,7 +1512,7 @@ def init_sweep_tab():
                     meas_prim = np.tile(ex_v1[0], len(ex_v2))
                     meas_sec = np.repeat(ex_v2, len(ex_v1[0]))
                     meas_i0 = i_to_save[-1]  # Only take the last drain!
-                    exp_drains = [x for x in i_to_save]
+                    exp_drains = i_to_save.copy()
                     if aborted:  # Let close() close the window, after the experiment has ended.
                         lbl_progress["text"] = "Closing (once the sweep is done)... "
                         window_load.title("Closing...")
@@ -1461,7 +1584,9 @@ def init_sweep_tab():
                             inc_type = 'transient'
                             ax.set_xlabel("t (sec)")  # Also change the x-axis label.
                         else:
-                            ax.set_xlabel("v({}) (v)".format(p_prim[0]))  # If it's a periodic sweep, the label should stay the same.
+                            ax.set_xlabel("V({}) (v)".format(p_prim[0]))  # If it's a periodic sweep, the label should stay the same.
+                        global mid_meas
+                        mid_meas = True
 
                         measurement_vars.incr_vars = []     # Reset the variables that are used to communicate between
                         measurement_vars.ex_vars = []       # measurements.py and this file
@@ -1507,7 +1632,7 @@ def init_sweep_tab():
                 # As defined in add_experiment().
 
                 if aborted:  # Let close() close the window, after the experiment has ended.
-                    lbl_progress["text"] = "Closing (once the sweep is done)... "
+                    lbl_progress["text"] = "Closing (once done)... "
                     window_load.title("Closing...")
                     if measurement_vars.ex_finished:  # If the measurement has already finished
                         window_load.grab_release()
@@ -1525,7 +1650,6 @@ def init_sweep_tab():
                     meas_order = ''.join([extract_var_letter(x) for x in run_vars])
                     meas_order = 'C' + meas_order
                     set_labels(meas_order)
-                    global meas_type
                     meas_type = 'char'  # For the "Use data from last experiment" option
                     names = [f"v({stv_name2.get()})", f"v({stv_name1.get()})",
                              "I ({})".format(split('\(|\)', stv_name3.get())[1])]
@@ -1570,17 +1694,18 @@ def init_sweep_tab():
                         data_to_analyze = [list(x) for x in zip(*data_to_save)]  # (num_drains+4) columns
                         data_to_analyze = [data_to_analyze[0],
                                            *data_to_analyze[secondary_col - 1:]]  # 4/5 columns (uses the LAST drain)
-                        # data_to_save = [names, *data_to_save]
                         names = ['t', 'I (' + param_list[0] + ')', 'I (' + param_list[1] + ')',
                                  'I (' + param_list[2] + ')']
                         if show_src:
                             names.append('I (Source)')
                         meas_order = 'T'
                         set_labels(meas_order)
+                        meas_type = 'transient'  # For the "Use data from last experiment" option
                         meas_prim = data_to_analyze[0]
+                        meas_sec = []
                         meas_i0 = data_to_analyze[1]  # TODO: Is this correct?
-                        for i in range(1,
-                                       len(data_to_save[0]) + secondary_col):  # Save each of the experiments separately
+                        meas_ia = []
+                        for i in range(1, len(data_to_save[0]) + secondary_col):  # Save each experiment separately
                             sliced = [[row[0], row[i], *row[secondary_col:]] for row in data_to_save]
                             sliced = [names, *sliced]
                             params_to_file = [index, *info, meas_order, '']
@@ -1590,19 +1715,27 @@ def init_sweep_tab():
                             index += 1
 
                     elif inv_ex_type.get() == 1:  # Periodic sweep
-                        # meas_type = 'char'
-                        names = ['t', stv_name1.get(), 'i']
-                        ex_v1, ex_v2, ex_i = tuple(measurement_vars.ex_vars)
+                        meas_type = 'char'
+                        names = ['t', f'V({stv_name1.get()})', f'I({param_list[0]})']
+                        ex_v1, ex_t, ex_i = tuple(measurement_vars.ex_vars)
                         i_to_save = [[x for row in [meas[i] for meas in ex_i] for x in row] for i in
-                                     range(len(ex_i[0]))]
-                        temp_prim = np.tile(ex_v1[0], len(ex_v2))  # Convert the sweep voltages into spreadsheet format
-                        temp_sec = np.repeat(ex_v2, len(ex_v1[0]))
+                                     range(len(ex_i[0]))]  # See explanation in run_characteristic() > finish_sweep()
+                        # temp_prim = np.tile(ex_v1[0], len(ex_t))  # Convert the sweep voltages into spreadsheet format
+                        temp_prim = [x for row in ex_v1 for x in row]  # Flatten ex_v1. TODO: Is this okay?
+                        # temp_sec = np.repeat(ex_v2, len(ex_v1[0]))
+                        temp_t = [list(x) for x in zip(*ex_t)]  # Transposed so that each sub-list corresponds to a
+                        # different device
                         run_vars = [p_prim[0], p_sec[0], p_other[0]]
                         meas_order = ''.join([extract_var_letter(x) for x in run_vars])  # Get the abbreviation
                         meas_order = 'T' + meas_order  # Add 'T' to denote that it's a periodic sweep
                         set_labels(meas_order)
 
                         for i in range(len(i_to_save)):  # For each drain
+                            temp_sec = temp_t[device_names.index(ordered_devs[i])]  # Take the drain's
+                            # device name; Find its index (0-3) which corresponds to the index in temp_t; And then
+                            # convert it into spreadsheet format. TODO: Check if this works!
+                            temp_sec = [x.seconds + 1e-6 * x.microseconds for x in temp_sec]
+                            temp_sec = np.repeat(temp_sec, len(ex_v1[0]))
                             data_to_save = [list(x) for x in
                                             zip(temp_sec, temp_prim, i_to_save[i])]  # "Transpose" the rows
                             data_to_save = [names, *data_to_save]  # Add a row for the variable names
@@ -1627,13 +1760,14 @@ def init_sweep_tab():
                     ax2.set_ylabel("I ({})".format(param_list[1]))
                     ax3.set_ylabel("I ({})".format(param_list[2]))
                     ax4.set_ylabel("I (Source)")
-                    ax.set_xlabel("v({}) (v)".format(p_prim[0]))
+                    ax.set_xlabel("V({}) (v)".format(p_prim[0]))
                     bar.draw()
                     for a in [ax, ax2, ax3, ax4]:  # Since the next measurement is a characteristic, we can set the xlims
                         a.set_xlim(p_prim[1], p_prim[2])    # in advance.
                     prb["value"] = 0  # Reset the progressbar
-                    global inc_type
+                    global inc_type, mid_meas
                     inc_type = 'sweep'
+                    mid_meas = False
                     measurement_vars.incr_vars = []     # Reset the variables that are used to communicate between
                     measurement_vars.ex_vars = []       # measurements.py and this file
                     measurement_vars.send_sweep = []
@@ -1680,7 +1814,7 @@ def init_sweep_tab():
                     global meas_prim, meas_sec, meas_i0, meas_ia, meas_order, exp_drains
                     meas_prim = np.tile(ex_v1[0], len(ex_v2))  # Convert the variable data into spreadsheet format
                     meas_sec = np.repeat(ex_v2, len(ex_v1[0]))
-                    meas_i0 = exp_drains[-1]  # Only take the last drain!
+                    meas_i0 = exp_drains[-1][:len(i_to_save[-1])]  # Only take the last drain!
                     meas_ia = i_to_save[-1]
                     run_vars = [p_prim[0], p_sec[0], p_other[0]]
                     meas_order = ''.join(
@@ -1781,17 +1915,18 @@ def init_sweep_tab():
                 p_time_params = [params[0], *[suffix(s.get()) for s in [stv_ex_interval, stv_ex_n, stv_ex_tot,
                                                                         stv_ex_hold]]]
             p_smus = [drain_smus, stv_smu2.get(), stv_smu3.get(), stv_smu4.get()]
-            global inc_type
+            global inc_type, mid_meas
             inc_type = 'sweep'
+            mid_meas = False  # True if the second measurement is being performed (mainly for the periodic sweep).
 
             # Save the configuration of the exposure parameters
             with open("data/settings/config_e.csv", "w", newline='') as f:  # Rewrite the file
                 csv_writer = writer(f)
-                to_write = [stv_ex_i0.get(), stv_ex_ia.get(), inv_ex_type.get(),
+                to_write = [[stv_ex_i0.get(), stv_ex_ia.get(), inv_ex_type.get(), '', '', ''],
                             [s.get() for s in [*stvs_ex_tvars, *stvs_ex_tcomps]],
                             [*[s.get() for s in [stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold]],
-                             inv_ex_limit.get()],
-                            [s.get() for s in [stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between]]]
+                             inv_ex_limit.get(), ''],
+                            [*[s.get() for s in [stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between]], '', '']]
                 csv_writer.writerows(to_write)
 
             window_exp.destroy()
@@ -1813,7 +1948,7 @@ def init_sweep_tab():
             ax2.set_ylabel("I ({})".format(param_list[1]))
             ax3.set_ylabel("I ({})".format(param_list[2]))
             ax4.set_ylabel("I (Source)")
-            ax.set_xlabel("v({}) (v)".format(p_prim[0]))
+            ax.set_xlabel("V({}) (v)".format(p_prim[0]))
             show_src = stv_smu4.get() != "(None)"
             ax4.set_visible(show_src)
             bar.draw()
@@ -1868,6 +2003,9 @@ def init_sweep_tab():
             with open("data/settings/config_e.csv", newline='') as f:
                 csv_reader = reader(f)
                 loadout = list(csv_reader)
+            for row in loadout:
+                if len(row) != 6:
+                    rewrite_prefs('e')
             stv_ex_i0.set(loadout[0][0])
             stv_ex_ia.set(loadout[0][1])
             inv_ex_type.set(int(loadout[0][2]))
@@ -1875,7 +2013,7 @@ def init_sweep_tab():
                 s.set(loadout[1][i])
             for i, s in enumerate([stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold]):
                 s.set(loadout[2][i])
-            inv_ex_limit.set(loadout[2][-1])
+            inv_ex_limit.set(loadout[2][4])
             for i, s in enumerate([stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between]):
                 s.set(loadout[3][i])
 
@@ -1925,7 +2063,7 @@ def init_sweep_tab():
         # by their "role" - Primary, secondary, constant.
 
         frm_ex_names.rowconfigure(0, weight=1)  # Contains the two current names and the "Run" button.
-        frm_ex_names.columnconfigure([*range(5)], weight=1)
+        frm_ex_names.columnconfigure([*range(6)], weight=1)
         stv_ex_i0, stv_ex_ia = tk.StringVar(), tk.StringVar()
         # stv_ex_i0, stv_ex_ia = tk.StringVar(value='i0'), tk.StringVar(value='ia')
         ttk.Label(frm_ex_names, text="Initial current name: ").grid(row=0, column=0, sticky="e", padx=10)
@@ -1934,8 +2072,10 @@ def init_sweep_tab():
         ttk.Label(frm_ex_names, text="Final current name: ").grid(row=0, column=2, sticky="e", padx=10)
         ent_ex_ia = ttk.Entry(frm_ex_names, textvariable=stv_ex_ia, width=5)
         ent_ex_ia.grid(row=0, column=3, sticky="ew")
+        btn_ex_load = ttk.Button(frm_ex_names, text="Load last configuration", command=load_ex_config)
+        btn_ex_load.grid(row=0, column=4, sticky="ew", padx=10, pady=5)
         btn_ex_run = ttk.Button(frm_ex_names, text="Run", command=start_exposure)
-        btn_ex_run.grid(row=0, column=4, sticky="ew", padx=10, pady=5)
+        btn_ex_run.grid(row=0, column=5, sticky="ew", padx=10, pady=5)
 
         frm_ex_transient.rowconfigure([*range(10)], weight=1)  # Contains the parameters required for a transient...
         frm_ex_transient.columnconfigure([0, 1, 2, 3, 4], weight=1)  # ...second measurement.
@@ -1950,7 +2090,7 @@ def init_sweep_tab():
         ents_ex_tcomps = []
 
         for i in range(3):
-            ttk.Label(frm_ex_transient, text=params[i] + ":").grid(row=i + 2, column=0)
+            ttk.Label(frm_ex_transient, text=param_list[i] + ":").grid(row=i + 2, column=0)
             ents_ex_tvars.append(ttk.Entry(frm_ex_transient, textvariable=stvs_ex_tvars[i], width=5))
             ents_ex_tvars[-1].grid(row=i + 2, column=1, sticky="ew", padx=5)
             ttk.Label(frm_ex_transient, text="v, compliance: ").grid(row=i + 2, column=2, sticky="nsew")
@@ -1976,7 +2116,7 @@ def init_sweep_tab():
         ttk.Label(frm_ex_transient, text="sec").grid(row=5, column=4, sticky="w")
         ttk.Label(frm_ex_transient, text="sec").grid(row=7, column=4, sticky="w")
         ttk.Label(frm_ex_transient, text="sec").grid(row=8, column=4, sticky="w")
-        inv_ex_limit = tk.IntVar(value=1)
+        inv_ex_limit = tk.IntVar(value=0)
         chk_ex_limit_time = ttk.Checkbutton(frm_ex_transient, text="Limit run time to the set value",
                                             variable=inv_ex_limit, onvalue=1, offvalue=0)
         chk_ex_limit_time.grid(row=9, column=0, columnspan=5, sticky="nsw", padx=5)
@@ -1994,7 +2134,7 @@ def init_sweep_tab():
         stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between = tk.StringVar(), tk.StringVar(), tk.StringVar(), \
                                                                        tk.StringVar()
         # stv_ex_sweepvar, stv_ex_s_comp, stv_ex_s_n, stv_ex_s_between = tk.StringVar(value='25'), \
-        #                                                                tk.StringVar(value='1u'), tk.StringVar(value=4), \
+        #                                                            tk.StringVar(value='1u'), tk.StringVar(value=4), \
         #                                                                tk.StringVar(value='3')
         ttk.Label(frm_ex_sweep, text=params[1] + ": ").grid(row=1, column=0, padx=5)
         ent_ex_s_var2 = ttk.Entry(frm_ex_sweep, textvariable=stv_ex_sweepvar, width=5, state=tk.DISABLED)  # The VALUE of the var
@@ -2013,9 +2153,6 @@ def init_sweep_tab():
         ex_sweep_notification = "The parameters of the sweep (on " + params[0] + "), the \nconstant variable (" + \
                                 params[1] + "), and the timing \n(hold, delay) will be taken from the main window. "
         ttk.Label(frm_ex_sweep, text=ex_sweep_notification).grid(row=4, column=0, columnspan=5, padx=5, pady=10)
-
-        # Load the last run configuration from the file
-        load_ex_config()
 
         def update_ex_time_params(var, t):
             """
@@ -2254,7 +2391,11 @@ def init_sweep_tab():
     # Save/Load frame
     with open("data/settings/configs_s.csv", newline='') as f:
         csv_reader = reader(f)
-        config_names = [row[0] for row in list(csv_reader)[1:]]  # Read the name of each config to config_names
+        configs = list(csv_reader)
+        config_names = [row[0] for row in configs[1:]]  # Read the name of each config to config_names
+    for row in configs:  # Check that the file is valid
+        if len(row) != 31:
+            rewrite_prefs('s')
 
     frm_saveload.columnconfigure([*range(8)], weight=1)
     frm_saveload.rowconfigure(0, weight=1)
@@ -2296,36 +2437,36 @@ def init_time_tab():
                         num_of_blanks = num_of_blanks + 1
                 if num_of_blanks == 1:  # Fill the blank entrybox with the appropriate calculated value.
                     if interval == '':  # The interval can be any float.
-                        n = str(int(round(float(n))))  # Round n. For some reason int(n) didn't work...
+                        n = strf(int(round(float(n))))  # Round n. For some reason int(n) didn't work...
                         stv_n.set(n)  # Set n to the round value, in case the user changed it to a float
-                        stv_int.set(str(suffix(tot) / (int(n) - 1)))
+                        stv_int.set(strf(suffix(tot) / (int(n) - 1)))
                     if n == '':     # N must be an integer! So update the third entrybox (not the one that was just
                                     # updated, nor the N entrybox) accordingly if N was rounded.
                         stv_n.set(
-                            str(round(suffix(tot) / suffix(interval) + 1)))  # But now int or tot need to be set again,
+                            strf(round(suffix(tot) / suffix(interval) + 1)))  # But now int or tot need to be set again,
                         if t == 'int':  # If the interval was changed, update the total
-                            stv_tot.set(str(suffix(interval) * (int(stv_n.get()) - 1)))
+                            stv_tot.set(strf(suffix(interval) * (int(stv_n.get()) - 1)))
                         if t == 'tot':  # If the total was changed, update the interval
-                            stv_int.set(str(suffix(tot) / (int(stv_n.get()) - 1)))
+                            stv_int.set(strf(suffix(tot) / (int(stv_n.get()) - 1)))
                     if tot == '':  # The total can be any float.
-                        n = str(int(round(float(n))))  # Round n
+                        n = strf(int(round(float(n))))  # Round n
                         stv_n.set(n)  # Set n to the round value, in case the user changed it to a float
-                        stv_tot.set(str(suffix(interval) * (int(n) - 1)))
+                        stv_tot.set(strf(suffix(interval) * (int(n) - 1)))
                 elif num_of_blanks == 0:    # If all three entryboxes are filled in, update the total (arbitrarily),
                                             # unless that was the entrybox that was just updated (in which case the
                                             # interval or n will be updated).
                     if t == 'int':  # Update tot
-                        stv_tot.set(str(suffix(interval) * (int(n) - 1)))
+                        stv_tot.set(strf(suffix(interval) * (int(n) - 1)))
                     if t == 'n':  # Round n and update it, then update tot
-                        n = str(int(round(float(n))))
+                        n = strf(int(round(float(n))))
                         stv_n.set(n)
-                        stv_tot.set(str(suffix(interval) * (int(n) - 1)))
+                        stv_tot.set(strf(suffix(interval) * (int(n) - 1)))
                     if t == 'tot':  # Update int or n
                         if suffix(tot) % suffix(interval) == 0:  # If the total is divisible by the interval, the user
                                 # probably deliberately set it that way. Therefore, update n.
-                            stv_n.set(str(int(suffix(tot) / suffix(interval) + 1)))
+                            stv_n.set(strf(int(suffix(tot) / suffix(interval) + 1)))
                         else:  # Otherwise, update the interval, since it can be any float.
-                            stv_int.set(str(suffix(tot) / (int(n) - 1)))
+                            stv_int.set(strf(suffix(tot) / (int(n) - 1)))
             except (ValueError, ZeroDivisionError):
                 return
 
@@ -2385,16 +2526,32 @@ def init_time_tab():
             ax2.set_ylabel("I (" + param_list[1] + ")")
             ax3.set_ylabel("I (" + param_list[2] + ")")
             ax4.set_ylabel("I (Source)")
+            ax.set_xlabel("t (sec)")
+            ax2.yaxis.set_label_position("right")
+            ax3.yaxis.set_label_position("right")
+            ax4.yaxis.set_label_position("right")
+            ax.spines["left"].set_edgecolor(color_d1)
+            ax2.spines["right"].set_edgecolor(color_g1)
+            ax3.spines["right"].set_edgecolor(color_g2)
+            ax4.spines["right"].set_edgecolor(color_src)
+            ax.tick_params(axis='y', colors=color_d1)
+            ax2.tick_params(axis='y', colors=color_g1)
+            ax3.tick_params(axis='y', colors=color_g2)
+            ax4.tick_params(axis='y', colors=color_src)
+            ax.yaxis.label.set_color(color_d1)
+            ax2.yaxis.label.set_color(color_g1)
+            ax3.yaxis.label.set_color(color_g2)
+            ax4.yaxis.label.set_color(color_src)
             if chk_linlog.instate(['selected']):  # Set the y-axis scale back to what it was
                 ax.set_yscale('log')
-                ax2.set_yscale('log')
-                ax3.set_yscale('log')
-                ax4.set_yscale('log')
+                # ax2.set_yscale('log')
+                # ax3.set_yscale('log')
+                # ax4.set_yscale('log')
             else:
                 ax.set_yscale('linear')
-                ax2.set_yscale('linear')
-                ax3.set_yscale('linear')
-                ax4.set_yscale('linear')
+                # ax2.set_yscale('linear')
+                # ax3.set_yscale('linear')
+                # ax4.set_yscale('linear')
             bar.draw()
 
         def finish_sweep(aborted=False):
@@ -2407,7 +2564,7 @@ def init_time_tab():
             "Finish" button.
             """
             if aborted:  # Let close() close the window, after the experiment has ended.
-                lbl_progress["text"] = "Closing (once the sweep is done)... "
+                lbl_progress["text"] = "Closing (once done)... "
                 window_load.title("Closing...")
                 if measurement_vars.ex_finished:  # If the measurement has already finished
                     window_load.grab_release()
@@ -2467,14 +2624,14 @@ def init_time_tab():
             """
             if chk_linlog.instate(['selected']):
                 ax.set_yscale('log')
-                ax2.set_yscale('log')
-                ax3.set_yscale('log')
-                ax4.set_yscale('log')
+                # ax2.set_yscale('log')
+                # ax3.set_yscale('log')
+                # ax4.set_yscale('log')
             else:
                 ax.set_yscale('linear')
-                ax2.set_yscale('linear')
-                ax3.set_yscale('linear')
-                ax4.set_yscale('linear')
+                # ax2.set_yscale('linear')
+                # ax3.set_yscale('linear')
+                # ax4.set_yscale('linear')
             bar.draw()
 
         def additional_currents():
@@ -2610,8 +2767,9 @@ def init_time_tab():
                 try:
                     suffix(i)
                 except ValueError:
-                    messagebox.showerror('', "The following parameters must be numeric: Start, Stop, Step, No. of "
-                                             "points, Compliance, Constant variable value.")
+                    messagebox.showerror('', "The following parameters must be numeric: Voltages, Compliances, "
+                                         "Increment, No. of points, Total measuring time, Hold time, and No. of "
+                                         "measurements per update.")
                     return
             str_limit = "True" if inv_limit_time.get() == 1 else "False"
             save_params = [*params[:15], params[-1], *params[15:19], str_limit, *param_list]
@@ -2887,7 +3045,11 @@ def init_time_tab():
     # Save/Load frame
     with open("data/settings/configs_t.csv", newline='') as f:
         csv_reader = reader(f)
-        config_t_names = [row[0] for row in list(csv_reader)[1:]]  # Read the name of each config to config_names
+        configs = list(csv_reader)
+        config_t_names = [row[0] for row in configs[1:]]  # Read the name of each config to config_names
+    for row in configs:
+        if len(row) != 25:
+            rewrite_prefs('t')
 
     frm_tsaveload.columnconfigure([*range(8)], weight=1)
     frm_tsaveload.rowconfigure(0, weight=1)
@@ -3195,11 +3357,12 @@ def init_analysis_tab():
     """
     Allows the user to analyze the experiments.
     """
-    def enable_buttons(enable=True, meas=None):
+    def enable_buttons(enable=True, meas=None, force_rdb=False):
         """
         Enables/disables the analysis buttons.
         :param enable: False if all the buttons should be disabled. True if any of them should be enabled.
         :param meas: The type of the selected experiment. Can be None/'char'/'exposure'/'transient'.
+        :param force_rdb: If True, automatically selects the "Use data from table" button.
         """
         state_s, state_mult, state_t, state_file = tk.DISABLED, tk.DISABLED, tk.DISABLED, tk.DISABLED
         """
@@ -3247,6 +3410,8 @@ def init_analysis_tab():
         btn_t_ioffon["state"] = state_t
         btn_t_risefall["state"] = state_t
         # btn_t_fit["state"] = tk.DISABLED
+        if force_rdb:  # Select "Use data from table"
+            inv_input.set(0)
 
     def delete_experiment():
         """
@@ -3370,8 +3535,8 @@ def init_analysis_tab():
     frm_table.columnconfigure(0, weight=2)
     frm_table.columnconfigure([1, 2], weight=1)
     tree = ttk.Treeview(frm_table)  # The table that contains the experiment info
-    tree.bind('<<TreeviewSelect>>', lambda e: enable_buttons())  # Whenever an experiment is selected, only enable the
-    # buttons that are relevant to its type.
+    tree.bind('<<TreeviewSelect>>', lambda e: enable_buttons(force_rdb=True))  # Whenever an experiment is selected,
+    # only enable the buttons that are relevant to its type.
     tree.grid(row=0, column=0, columnspan=3, sticky="nsew")
     update_table(tree)  # Initialize the table
     control_tabs.bind("<<NotebookTabChanged>>", lambda e: temp_update_table(tree))  # Update it whenever the "Analysis"
@@ -3390,7 +3555,7 @@ def init_analysis_tab():
                                  command=lambda: enable_buttons(enable=False))
     rdb_input1.grid(row=2, column=0, sticky="w")
     rdb_input2 = ttk.Radiobutton(frm_table, text="Use data from last experiment", variable=inv_input, value=1,
-                                 command=lambda: enable_buttons(True, meas_type))
+                                 command=lambda: enable_buttons(True, meas=meas_type))
     rdb_input2.grid(row=3, column=0, sticky="w")
     btn_open = ttk.Button(frm_table, text="Open experiment data", state=tk.DISABLED, command=lambda: open_excel())
     btn_open.grid(row=2, column=1, columnspan=2, sticky="nsew", padx=10, pady=5)
@@ -3466,7 +3631,7 @@ def init_analysis_tab():
                 new_data = [list(x) for x in zip(*list(reader))]  # Transpose to obtain 3, 4 or 5 lists corresponding
                 # to the columns.
             for col in new_data:
-                while not numeric(col[0]):  # Remove the headers
+                while not numeric(col[0].replace(':', '')):  # Remove the headers (and ignore colons for time values)
                     col.pop(0)
             var_order = tree.item(tree.focus()).get("values")[-2]  # Get the variable abbreviation (e.g. "JBD")
             if len(var_order) == 3:  # Exposure -> Save in data_prim, data_sec, data_i0 and data_ia.
@@ -3478,7 +3643,7 @@ def init_analysis_tab():
                 data_prim, data_sec, data_i0 = spreadsheet_format_to_data(new_data[0], new_data[1], new_data[2])
                 data_ia = []  # Reset it completely
             elif len(var_order) == 1:  # Transient -> Save in data_prim and data_i0. Disregard the 3 additional currents
-                data_prim = [float(x) for x in new_data[0]]
+                data_prim = [round(float(x), 2) for x in new_data[0]]
                 data_i0 = off_noise(fix_e(new_data[1]), 1e-12)
                 data_sec = []
                 data_ia = []
@@ -3515,9 +3680,17 @@ def init_analysis_tab():
         except ValueError as e:  # Most likely raised from within plot_yvv()
             messagebox.showerror('', "Invalid data. Make sure all the columns are the same length, and all "
                                      "the values (besides the headers) are numeric.")
-            # tb = traceback.format_exc()
+            tb = traceback.format_exc()
+            print(str(tb))
             # logging.error(str(e) + ". Traceback: " + str(tb))
             global current_id
+            current_id = -1
+            return
+        except (TypeError, IndexError) as e:
+            messagebox.showerror('', "Invalid data. Please make sure your data is in the correct format. ")
+            tb = traceback.format_exc()
+            print(str(tb))
+            # logging.error(str(e) + ". Traceback: " + str(tb))
             current_id = -1
             return
 
@@ -3821,6 +3994,7 @@ def init_settings_tab():
         with open('data/settings/preferences.csv', 'w', newline='') as f:
             csv_writer = writer(f)
             csv_writer.writerows([[row] for row in new_prefs])  # TODO: Edge cases; Confirmation; Check empties.
+            csv_writer.writerow([color_d1, color_d2, color_g1, color_g2, color_src])
         messagebox.showinfo('', 'Preferences saved.')
 
     def pick_color(sender, target, init_color=None):
@@ -3832,8 +4006,8 @@ def init_settings_tab():
         """
         global color_d1, color_d2, color_g1, color_g2, color_src
         color = askcolor(color=to_hex(init_color), title=f"Choose color: {target} current")[0]
-        color = tuple([x/255 for x in color])
         if color is not None:
+            color = tuple([x / 255 for x in color])
             sender["background"] = to_hex(color)
             match target:
                 case 'first drain':
@@ -3894,7 +4068,7 @@ def init_settings_tab():
     stv_s_timegroup = tk.StringVar(value='1')
     ttk.Label(tab_settings, text="Update the transient display after every ").grid(row=0, column=0, sticky='ew')
     ent_timegroup = ttk.Entry(tab_settings, text='1', textvariable=stv_s_timegroup, width=7)
-    ent_timegroup.grid(row=0, column=1, sticky='nsw', padx=5, pady=5)
+    ent_timegroup.grid(row=0, column=1, sticky='nsew', padx=5, pady=5)
     ttk.Label(tab_settings, text=" measurements (reduces unnecessary delay between measurements)")\
         .grid(row=0, column=2, columnspan=3, sticky="w")
     
@@ -3949,7 +4123,7 @@ def init_settings_tab():
     stv_s_sts = tk.StringVar(value='30')
     ent_s_sts = ttk.Entry(tab_settings, textvariable=stv_s_sts, width=7)
     ent_s_sts.grid(row=4, column=1, sticky="nsw", padx=5, pady=5)
-    ttk.Label(tab_settings, text="% of the second derivative")\
+    ttk.Label(tab_settings, text="% of the derivative")\
         .grid(row=4, column=2, columnspan=3, sticky="w", padx=5, pady=5)
 
     ttk.Label(tab_settings, text="On-current definition: greater than ")\
@@ -3961,15 +4135,35 @@ def init_settings_tab():
         .grid(row=5, column=2, columnspan=3, sticky="w", padx=5, pady=5)
 
     btn_save_prefs = ttk.Button(tab_settings, text="Save preferences", command=lambda: save_preferences())
-    btn_save_prefs.grid(row=6, column=0, columnspan=5, sticky="nsw", padx=20, pady=5, ipadx=10)
+    btn_save_prefs.grid(row=6, column=0, columnspan=5, sticky="nsw", padx=20, pady=10, ipadx=10)
 
-    # Load preferences
-    with open('data/settings/preferences.csv', 'r', newline='') as f:
-        csv_reader = reader(f)
-        preferences = list(csv_reader)
-    # Set the required StringVars to the read values
-    for s, p in zip([stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion], preferences):
-        s.set(p[0])
+    try:
+        # Load preferences
+        with open('data/settings/preferences.csv', 'r', newline='') as f:
+            csv_reader = reader(f)
+            preferences = list(csv_reader)
+        if len(preferences) != 6:
+            raise IndexError
+        if len(preferences[-1]) != 5:
+            raise IndexError
+        # Set the required StringVars to the read values
+        for s, p in zip([stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion], preferences[:-1]):
+            s.set(p[0])
+        # Convert the 5 colors into tuples of floats, then set the respective color variables to them
+        tuplst = []
+        for s in preferences[-1]:
+            tupstr = s.replace('(', '').replace(')', '').split(', ')
+            tuplst.append(tuple([float(x) for x in tupstr]))
+        color_d1 = tuplst[0]
+        color_d2 = tuplst[1]
+        color_g1 = tuplst[2]
+        color_g2 = tuplst[3]
+        color_src = tuplst[4]
+        # Update the labels themselves
+        for i, l in enumerate([clr_d1, clr_d2, clr_g1, clr_g2, clr_src]):
+            l["background"] = to_hex(tuplst[i])
+    except IndexError:
+        rewrite_prefs('p')
 
 
 try:
@@ -4010,7 +4204,13 @@ try:
     with open('data/settings/transistor_data.csv', newline='') as f:
         csv_reader = reader(f)
         temp_trans_data = list(csv_reader)
+        for row in temp_trans_data[:-2]:  # Validation
+            if len(row) != 4:
+                rewrite_prefs('d')
         for i in range(4):
+            for s in temp_trans_data[i]:  # Validation
+                if s.lower() not in ['true', 'false']:
+                    rewrite_prefs('d')
             active_trans.append([True if s == 'True' else False for s in temp_trans_data[i]])
         device_names = temp_trans_data[4]
         trans_names = temp_trans_data[5:9]

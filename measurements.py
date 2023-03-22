@@ -20,7 +20,7 @@ def sweep(b1500, params, w, source_active, board, pinno):  # params is a nested 
     # Prim/sec = [name, start, stop, step, n, comp]
     # Other = [name3, const, constcomp, hold, delay, param_list]
     logging.basicConfig(filename="logs.log", level=logging.ERROR, format='%(asctime)s %(levelname)s: %(message)s',
-                        datefmt='%m/%d/%Y %i:%M:%S %p')  # Set the format to use in logs.txt
+                        datefmt='%m/%d/%Y %H:%M:%S')  # Set the format to use in logs.txt
     try:
         # Display the "Initializing" message
         measurement_vars.incr_vars = [0, 0, 4]
@@ -31,10 +31,10 @@ def sweep(b1500, params, w, source_active, board, pinno):  # params is a nested 
         for smu in b1500.smu_references:
             smu.enable()  # enable SMU
             smu.adc_type = 'HRADC'  # set ADC to high-resoultion ADC
-            smu.meas_range_current = '1 nA'  # TODO: ??????
+            smu.meas_range_current = '1 nA'  # Not entirely sure what this means.
             smu.meas_op_mode = 'COMPLIANCE_SIDE'  # other choices: Current, Voltage, FORCE_SIDE, COMPLIANCE_AND_FORCE_SIDE
         b1500.adc_setup('HRADC', 'PLC', 3)
-        b1500.sweep_timing(params[2][3], params[2][4], step_delay=params[2][4])  # hold, delay, step delay.
+        b1500.sweep_timing(params[2][3], params[2][4], step_delay=0)  # hold, delay, step delay.
         b1500.sweep_auto_abort(False, post='STOP')
 
         orderly_smus = list(b1500.smu_references)
@@ -74,7 +74,7 @@ def sweep(b1500, params, w, source_active, board, pinno):  # params is a nested 
             smu_ground.force('Voltage', 'Auto Ranging', 0)
 
         # For debugging purposes:
-        print(f"param_list: {params[0][0]}, {params[1][0]}, {params[2][0]}")
+        # print(f"param_list: {params[0][0]}, {params[1][0]}, {params[2][0]}")
 
         for i in range(16):  # Set up the Arduino
             board.pinMode(pinno[i], "OUTPUT")
@@ -82,7 +82,7 @@ def sweep(b1500, params, w, source_active, board, pinno):  # params is a nested 
         num_active = len([x for row in params[4] for x in row if x])  # The number of active drains
         row_active = [any(row) for row in params[4]]  # True if the corresponding row has at least one active transistor
         num_active_rows = len([x for x in row_active if x])  # The number of rows that have an active transistor
-        print(f"{num_active} active drains; {num_active_rows} active rows.")
+        # print(f"{num_active} active drains; {num_active_rows} active rows.")
 
         b1500.check_errors()
         b1500.clear_buffer()
@@ -148,13 +148,14 @@ def sweep(b1500, params, w, source_active, board, pinno):  # params is a nested 
                         return
 
             # Run one more measurement where all of the relays are closed
-            b1500.send_trigger()
-            b1500.check_idle()
-            other_currents = b1500.read_data(params[0][4])
-            tempdata.append(other_currents.iloc[:, names.index(params[3][1])].values.tolist())  # The two non-drain currents
-            tempdata.append(other_currents.iloc[:, names.index(params[3][2])].values.tolist())
+            # b1500.send_trigger()
+            # b1500.check_idle()
+            # other_currents = b1500.read_data(params[0][4])
+            # TODO: Does taking from raw_data instead of other_currents work?
+            tempdata.append(raw_data.iloc[:, names.index(params[3][1])].values.tolist())  # The two non-drain currents
+            tempdata.append(raw_data.iloc[:, names.index(params[3][2])].values.tolist())
             if source_active:
-                tempdata.append(other_currents[names.index(params[3][3])])  # Source
+                tempdata.append(raw_data[names.index(params[3][3])])  # Source
             print("Measurement complete. ")
             # tempdata now contains all the drain measurements, then sec, then const, then (optionally) source.
 
@@ -182,12 +183,12 @@ def sweep(b1500, params, w, source_active, board, pinno):  # params is a nested 
 def transient(b1500, params, w, limit_time, groupsize, source_active, board, pinno):
     # Params = [param_list, [voltages], [comps], [varname, int, n, tot, hold, linlog], [SMU names], active_trans]
     logging.basicConfig(filename="logs.log", level=logging.ERROR, format='%(asctime)s %(levelname)s: %(message)s',
-                        datefmt='%m/%d/%Y')  # Set the format to use in logs.txt
+                        datefmt='%m/%d/%Y %H:%M:%S')  # Set the format to use in logs.txt
     try:
         for smu in b1500.smu_references:
             smu.enable()  # enable SMU
             smu.adc_type = 'HRADC'  # set ADC to high-resoultion ADC
-            smu.meas_range_current = '1 nA'  # TODO: ??????
+            smu.meas_range_current = '1 nA'  # Not entirely sure what this means.
             smu.meas_op_mode = 'COMPLIANCE_SIDE'  # other choices: Current, Voltage, FORCE_SIDE, COMPLIANCE_AND_FORCE_SIDE
         b1500.adc_setup('HRADC', 'PLC', 3)
 
@@ -214,8 +215,8 @@ def transient(b1500, params, w, limit_time, groupsize, source_active, board, pin
         row_active = [any(row) for row in params[5]]  # True if the corresponding row has at least one active transistor
         num_active_rows = len([x for x in row_active if x])
         fractional_int = params[3][1]/num_active_rows  # The interval for each device.
-        print(f"{num_active} active drains; {num_active_rows} active rows; Wait {fractional_int} "
-              f"between each measurement.")
+        # print(f"{num_active} active drains; {num_active_rows} active rows; Wait {fractional_int} "
+        #       f"between each measurement.")
 
         time.sleep(params[3][4])
         b1500.check_errors()
@@ -258,7 +259,8 @@ def transient(b1500, params, w, limit_time, groupsize, source_active, board, pin
                 tempdata.append(b1500.read_data(1).iloc[0].values.flatten().tolist())
             if source_active:  # Source
                 tempdata.append(b1500.read_data(1).iloc[0].values.flatten().tolist())
-            data.append([tempdata[0][0], *[t[1] for t in tempdata]])
+            t_avg = np.average([t[0] for t in tempdata])  # t[0] is the time of each spot measurement; Take the average.
+            data.append([t_avg, *[t[1] for t in tempdata]])
             if i % groupsize == 0:
                 measurement_vars.send_transient = [list(x) for x in zip(*data)]
                 w.event_generate("<<add-spot>>", when="tail")
@@ -276,13 +278,17 @@ def transient(b1500, params, w, limit_time, groupsize, source_active, board, pin
                 break
             measurement_vars.ex_vars = data  # For abortion purposes
 
+        # Update the graph one more time, in case groupsize > 0
+        measurement_vars.send_transient = [list(x) for x in zip(*data)]
+        w.event_generate("<<add-spot>>", when="tail")
+
         measurement_vars.ex_vars = data  # List of lists of length 5 (or 4) - no need to transpose later!
         measurement_vars.ex_finished = True
 
         # Bandaid solution to the mistiming:
         measurement_vars.incr_vars = 1
         w.event_generate("<<prb-increment>>", when="tail")
-        print(times_waited)
+        # print(times_waited)
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -291,7 +297,7 @@ def transient(b1500, params, w, limit_time, groupsize, source_active, board, pin
 
 def transient_sweep(b1500, params, w, source_active, board, pinno):
     logging.basicConfig(filename="logs.log", level=logging.ERROR, format='%(asctime)s %(levelname)s: %(message)s',
-                        datefmt='%m/%d/%Y %i:%M:%S %p')  # Set the format to use in logs.txt
+                        datefmt='%m/%d/%Y %H:%M:%S')  # Set the format to use in logs.txt
     # params = [p_prim, p_sec, p_other, p_smus, active_trans].
     # p_prim = [name, start, stop, step, n, comp]
     # p_sec = [name, value, comp, n, between]
@@ -306,10 +312,10 @@ def transient_sweep(b1500, params, w, source_active, board, pinno):
         for smu in b1500.smu_references:
             smu.enable()  # enable SMU
             smu.adc_type = 'HRADC'  # set ADC to high-resoultion ADC
-            smu.meas_range_current = '1 nA'  # TODO: ??????
+            smu.meas_range_current = '1 nA'  # Not entirely sure what this means.
             smu.meas_op_mode = 'COMPLIANCE_SIDE'  # other choices: Current, Voltage, FORCE_SIDE, COMPLIANCE_AND_FORCE_SIDE
         b1500.adc_setup('HRADC', 'PLC', 3)
-        b1500.sweep_timing(params[2][3], params[2][4], step_delay=params[2][4])  # hold,delay. TODO: step delay?
+        b1500.sweep_timing(params[2][3], params[2][4], step_delay=0)  # hold, delay, step delay.
         b1500.sweep_auto_abort(False, post='STOP')
 
         orderly_smus = list(b1500.smu_references)
@@ -351,7 +357,7 @@ def transient_sweep(b1500, params, w, source_active, board, pinno):
             smu_ground.force('Voltage', 'Auto Ranging', 0)
 
         # For debugging purposes:
-        print(f"param_list: {params[0][0]}, {params[1][0]}, {params[2][0]}")
+        # print(f"param_list: {params[0][0]}, {params[1][0]}, {params[2][0]}")
 
         for i in range(16):  # Set up the Arduino
             board.pinMode(pinno[i], "OUTPUT")
@@ -359,39 +365,43 @@ def transient_sweep(b1500, params, w, source_active, board, pinno):
         num_active = len([x for row in params[4] for x in row if x])  # The number of active drains
         row_active = [any(row) for row in params[4]]  # True if the corresponding row has at least one active transistor
         num_active_rows = len([x for x in row_active if x])  # The number of rows that have an active transistor
-        print(f"{num_active} active drains; {num_active_rows} active rows.")
+        # print(f"{num_active} active drains; {num_active_rows} active rows.")
 
         b1500.check_errors()
         b1500.clear_buffer()
         b1500.clear_timer()
 
         v1 = list(np.linspace(params[0][1], params[0][2], int(params[0][4])))
-        data = []
+        data = []  # A list of lists - each corresponding to a different time point (or rather, series of consecutive
+        # time points, since the measurements aren't instant)
         start_time = datetime.now()
-        t = []
+        t = []  # A list of lists - each sub-list corresponds to a different series of consecutive time points, and
+        # each time point within it corresponds to a different sweep (in the order of the measurements). The length
+        # of each sub-list is the number of active devices (num_active_rows).
         for k in range(int(params[1][3])):
-            v = params[1][1]  # TODO: Reformat the progressbar message and remove?
-            print("Starting measurement (" + params[1][0] + "=" + str(v) + "v)...")
+            print("Starting measurement (" + str(k+1) + ")...")
 
             if measurement_vars.stop_ex:
                 measurement_vars.stop_ex = False
                 w.event_generate("<<close-window>>", when="tail")
                 return
 
-            temp_t = datetime.now() - start_time
-            t.append(temp_t.seconds + temp_t.microseconds/1e6)  # TODO: Where do i put this? TODO: Minutes?
+            # temp_t = datetime.now() - start_time
+            temp_t = []  # The timestamps for the current round of measurements
+            # t.append(temp_t.seconds + temp_t.microseconds/1e6)  # TODO: Where do i put this? TODO: Minutes?
             tempdata = []  # The current round of measurements
             measured_rows = 0  # For the progressbar - the number of devices (rows) that have been measured this round
             for row in range(4):
                 if row_active[row]:  # Only measure the row if at least one transistor in it is selected
                     # Update the progressbar
                     measurement_vars.incr_vars = [(k*num_active_rows+measured_rows) /
-                                                  (params[1][3]*num_active_rows), v, row]
+                                                  (params[1][3]*num_active_rows), k+1, row]
                     w.event_generate("<<prb-increment>>", when="tail")
                     for col in range(4):
                         if params[4][row][col]:  # If this transistor should be measured (active)
                             board.digitalWrite(pinno[4*row+col], "HIGH")  # Open its relay
 
+                    temp_t.append(datetime.now() - start_time)  # Add the time and start the measurements
                     b1500.send_trigger()
                     b1500.check_idle()
                     # Turn off these 4
@@ -416,20 +426,23 @@ def transient_sweep(b1500, params, w, source_active, board, pinno):
             # tempdata should now have the ACTIVE DRAIN measurements only.
 
             # Run one more measurement where all of the relays are closed
-            b1500.send_trigger()
-            b1500.check_idle()
-            other_currents = b1500.read_data(params[0][4])
-            tempdata.append(other_currents.iloc[:, names.index(params[3][1])].values.tolist())  # The two non-drain currents
-            tempdata.append(other_currents.iloc[:, names.index(params[3][2])].values.tolist())
+            # b1500.send_trigger()
+            # b1500.check_idle()
+            # other_currents = b1500.read_data(params[0][4])
+            # TODO: Does taking from raw_data instead of other_currents work?
+            tempdata.append(raw_data.iloc[:, names.index(params[3][1])].values.tolist())  # The two non-drain currents
+            tempdata.append(raw_data.iloc[:, names.index(params[3][2])].values.tolist())
             if source_active:
-                tempdata.append(other_currents[names.index(params[3][3])])  # Source
+                tempdata.append(raw_data[names.index(params[3][3])])  # Source
+            t.append(temp_t)
             print("Measurement complete. ")
 
-            measurement_vars.incr_vars = [(k+1)/params[1][3], v, 5]
+            measurement_vars.incr_vars = [(k+1)/params[1][3], k+1, 5]
             w.event_generate("<<prb-increment>>", when="tail")
 
             measurement_vars.send_sweep = [v1, t, tempdata]
             data.append(tempdata[:num_active])  # Only the drains
+            measurement_vars.ex_vars = [[v1] * (k + 1), t, data]  # For abortion purposes
 
             if measurement_vars.stop_ex:
                 measurement_vars.stop_ex = False
@@ -442,7 +455,6 @@ def transient_sweep(b1500, params, w, source_active, board, pinno):
                 measurement_vars.stop_ex = False
                 w.event_generate("<<close-window>>", when="tail")
                 return
-            measurement_vars.ex_vars = [[v1] * (k + 1), t, data]  # For abortion purposes
         measurement_vars.ex_vars = [[v1]*int(params[1][3]), t, data]
         measurement_vars.ex_finished = True
     except Exception as e:
