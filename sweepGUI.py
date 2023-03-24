@@ -65,7 +65,7 @@ measurement_vars.stop_ex = False  # This is explained in open_measurement_window
 current_id = -1  # The highest ID out of the existing experiments. Is the global definition even necessary?!
 version = '1,0'
 err_msg = ''  # Error message for when the SPA isn't connected or services aren't running
-suppress_errors = False  # If True, doesn't show errors if the SPA/Arduino aren't connected. For debugging purposes.
+suppress_errors = True  # If True, doesn't show errors if the SPA/Arduino aren't connected. For debugging purposes.
 msg_on_init = False  # Becomes True if a messagebox appears while initializing the window. In this case, let
 # hacky_no_spa_1() wait.
 meas_prim, meas_sec, meas_i0, meas_ia = [], [], [], []
@@ -612,7 +612,7 @@ def rewrite_prefs(f):
                 csv_writer = writer(f)
                 csv_writer.writerows([['1'], ['Constant'], ['1n'], ['30'], ['10n']])
                 csv_writer.writerow(["(0, 0, 1)",
-                                     "(0.8392156862745098, 0.15294117647058825, 0.1568627450980392)",
+                                     "(1, 0, 0)",
                                      "(0.17254901960784313, 0.6274509803921569, 0.17254901960784313)",
                                      "(1, 0.5, 0)",
                                      "(0.09019607843137255, 0.7450980392156863, 0.8117647058823529)"])
@@ -1279,11 +1279,11 @@ def init_sweep_tab():
         window_load, fig, lbl_progress, chk_linlog, stv_ex_linlog, chk_currents, btn_ex_end, btn_ex_abort, prb, ax, ax2,\
         ax3, ax4, bar = open_measurement_window(p_prim, stv_linlog1)  # Open the measurement window, return the objects
                                                                       # that will be dynamically changed
-        ax.set_ylabel("I ({})".format(param_list[0]))
-        ax2.set_ylabel("I ({})".format(param_list[1]))
-        ax3.set_ylabel("I ({})".format(param_list[2]))
-        ax4.set_ylabel("I (Source)")
-        ax.set_xlabel("V({})".format(p_prim[0]))
+        ax.set_ylabel("I({}) [A]".format(param_list[0]))
+        ax2.set_ylabel("I({}) [A]".format(param_list[1]))
+        ax3.set_ylabel("I({}) [A]".format(param_list[2]))
+        ax4.set_ylabel("I(Source) [A]")
+        ax.set_xlabel("V({}) [V]".format(p_prim[0]))
         # If the source SMU wasn't set, hide the axis (and don't add its sweeps)
         show_src = stv_smu4.get() != "(None)"
         ax4.set_visible(show_src)
@@ -1431,11 +1431,11 @@ def init_sweep_tab():
                     ax4.spines.right.set_position(("axes", 1.4))
                     ax3.get_yaxis().get_offset_text().set_position((1.2, 5.0))
                     ax4.get_yaxis().get_offset_text().set_position((1.4, 5.0))
-                ax.set_ylabel("I ({})".format(param_list[0]))
-                ax2.set_ylabel("I ({})".format(param_list[1]))
-                ax3.set_ylabel("I ({})".format(param_list[2]))
-                ax4.set_ylabel("I (Source)")
-                ax.set_xlabel("t (sec)")
+                ax.set_ylabel("I({}) [A]".format(param_list[0]))
+                ax2.set_ylabel("I({}) [A]".format(param_list[1]))
+                ax3.set_ylabel("I({}) [A]".format(param_list[2]))
+                ax4.set_ylabel("I(Source)")
+                ax.set_xlabel("t [sec]")
                 ax2.yaxis.set_label_position("right")
                 ax3.yaxis.set_label_position("right")
                 ax4.yaxis.set_label_position("right")
@@ -1572,19 +1572,19 @@ def init_sweep_tab():
                             ax4.spines.right.set_position(("axes", 1.4))
                             ax3.get_yaxis().get_offset_text().set_position((1.2, 5.0))
                             ax4.get_yaxis().get_offset_text().set_position((1.4, 5.0))
-                        ax.set_ylabel("I ({})".format(param_list[0]))
-                        ax2.set_ylabel("I ({})".format(param_list[1]))
-                        ax3.set_ylabel("I ({})".format(param_list[2]))
-                        ax4.set_ylabel("I (Source)")
+                        ax.set_ylabel("I({}) [A]".format(param_list[0]))
+                        ax2.set_ylabel("I({}) [A]".format(param_list[1]))
+                        ax3.set_ylabel("I({}) [A]".format(param_list[2]))
+                        ax4.set_ylabel("I(Source) [A]")
                         bar.draw()
 
                         prb["value"] = 0  # Reset the progressbar
                         if inv_ex_type.get() == 0:  # If the second measurement is transient, set inc_type so that increment()
                             global inc_type         # can handle the progressbar accordingly.
                             inc_type = 'transient'
-                            ax.set_xlabel("t (sec)")  # Also change the x-axis label.
+                            ax.set_xlabel("t [sec]")  # Also change the x-axis label.
                         else:
-                            ax.set_xlabel("V({}) (v)".format(p_prim[0]))  # If it's a periodic sweep, the label should stay the same.
+                            ax.set_xlabel("V({}) [V]".format(p_prim[0]))  # If it's a periodic sweep, the label should stay the same.
                         global mid_meas
                         mid_meas = True
 
@@ -1756,11 +1756,11 @@ def init_sweep_tab():
                         ax4.spines.right.set_position(("axes", 1.4))
                         ax3.get_yaxis().get_offset_text().set_position((1.2, 5.0))
                         ax4.get_yaxis().get_offset_text().set_position((1.4, 5.0))
-                    ax.set_ylabel("I ({})".format(param_list[0]))
-                    ax2.set_ylabel("I ({})".format(param_list[1]))
-                    ax3.set_ylabel("I ({})".format(param_list[2]))
-                    ax4.set_ylabel("I (Source)")
-                    ax.set_xlabel("V({}) (v)".format(p_prim[0]))
+                    ax.set_ylabel("I({}) [A]".format(param_list[0]))
+                    ax2.set_ylabel("I({}) [A]".format(param_list[1]))
+                    ax3.set_ylabel("I({}) [A]".format(param_list[2]))
+                    ax4.set_ylabel("I(Source) [A]")
+                    ax.set_xlabel("V({}) [V]".format(p_prim[0]))
                     bar.draw()
                     for a in [ax, ax2, ax3, ax4]:  # Since the next measurement is a characteristic, we can set the xlims
                         a.set_xlim(p_prim[1], p_prim[2])    # in advance.
@@ -1944,11 +1944,11 @@ def init_sweep_tab():
             window_load.bind("<<prb-increment>>", increment)
             window_load.bind("<<add-sweep>>", add_sweep)
             window_load.bind("<<add-spot>>", add_spot)
-            ax.set_ylabel("I ({})".format(param_list[0]))
-            ax2.set_ylabel("I ({})".format(param_list[1]))
-            ax3.set_ylabel("I ({})".format(param_list[2]))
-            ax4.set_ylabel("I (Source)")
-            ax.set_xlabel("V({}) (v)".format(p_prim[0]))
+            ax.set_ylabel("I({}) [A]".format(param_list[0]))
+            ax2.set_ylabel("I({}) [A]".format(param_list[1]))
+            ax3.set_ylabel("I({}) [A]".format(param_list[2]))
+            ax4.set_ylabel("I(Source) [A]")
+            ax.set_xlabel("V({}) [V]".format(p_prim[0]))
             show_src = stv_smu4.get() != "(None)"
             ax4.set_visible(show_src)
             bar.draw()
@@ -2525,11 +2525,11 @@ def init_time_tab():
                 ax4.spines.right.set_position(("axes", 1.4))
                 ax3.get_yaxis().get_offset_text().set_position((1.2, 5.0))
                 ax4.get_yaxis().get_offset_text().set_position((1.4, 5.0))
-            ax.set_ylabel("I (" + param_list[0] + ")")
-            ax2.set_ylabel("I (" + param_list[1] + ")")
-            ax3.set_ylabel("I (" + param_list[2] + ")")
-            ax4.set_ylabel("I (Source)")
-            ax.set_xlabel("t (sec)")
+            ax.set_ylabel("I(" + param_list[0] + ") [A]")
+            ax2.set_ylabel("I(" + param_list[1] + ") [A]")
+            ax3.set_ylabel("I(" + param_list[2] + ") [A]")
+            ax4.set_ylabel("I(Source) [A]")
+            ax.set_xlabel("t [sec]")
             ax2.yaxis.set_label_position("right")
             ax3.yaxis.set_label_position("right")
             ax4.yaxis.set_label_position("right")
@@ -2713,11 +2713,11 @@ def init_time_tab():
         window_load, fig, lbl_progress, chk_linlog, stv_ex_linlog, chk_currents, btn_ex_end, btn_ex_abort, prb, ax, ax2,\
         ax3, ax4, bar = open_measurement_window(param_list[0], stv_linlog, True)  # Open the measurement window, return
         # the objects that will be dynamically changed
-        ax.set_ylabel("I (" + param_list[0] + ")")
-        ax2.set_ylabel("I (" + param_list[1] + ")")
-        ax3.set_ylabel("I (" + param_list[2] + ")")
-        ax4.set_ylabel("I (Source)")
-        ax.set_xlabel("t (sec)")
+        ax.set_ylabel("I(" + param_list[0] + ") [A]")
+        ax2.set_ylabel("I(" + param_list[1] + ") [A]")
+        ax3.set_ylabel("I(" + param_list[2] + ") [A]")
+        ax4.set_ylabel("I(Source)")
+        ax.set_xlabel("t [sec]")
         ax4.set_visible(show_src)
         bar.draw()
 
@@ -3421,19 +3421,24 @@ def init_analysis_tab():
         if force_rdb:  # Select "Use data from table"
             inv_input.set(0)
 
-    def delete_experiment():
+    def delete_experiment(file_exists=True):
         """
         Deletes the selected experiment - both the ex_#.csv file and its row in central.csv.
+        :param file_exists: Whether the ex_#.csv file exists or not. If False, it only deletes the respective row
+        in central.csv.
         """
-        if tk.messagebox.askyesno('', "This will also remove the experiment's data. Proceed?"):
+        msg = "This will also remove the experiment's data. Proceed?" if file_exists \
+            else "The experiment file does not exist. Remove it from the list?"
+        if tk.messagebox.askyesno('', msg):
             try:
                 del_id = tree.item(tree.focus()).get("values")[0]  # Get the ID of the selected row
-                del_path = "data/ex_" + str(del_id) + ".csv"  # Turn it into the desired file's path
-                if os.path.isfile(del_path):  # If the path exists
-                    os.remove(del_path)
-                else:
-                    tk.messagebox.showerror('', "File does not exist! (ID: " + del_id + ")")
-                    return
+                if file_exists:
+                    del_path = "data/ex_" + str(del_id) + ".csv"  # Turn it into the desired file's path
+                    if os.path.isfile(del_path):  # If the path exists
+                        os.remove(del_path)
+                    else:
+                        delete_experiment(False)
+                        return
                 with open("data/central.csv", newline='') as f:  # Get the existing data for all experiments
                     csv_reader = reader(f)
                     existing_data = list(csv_reader)
@@ -3461,6 +3466,9 @@ def init_analysis_tab():
         type) in a separate dialog window.
         """
         edit_row = tree.item(tree.focus()).get("values")  # Get the values of the selected row
+        if not os.path.isfile(f'data/ex_{edit_row[0]}.csv'):  # If the file does not exist, remove it from the list
+            delete_experiment(False)
+            return
         edit_window_out = tk.Toplevel(window)  # Open a new window
         edit_window_out.title("Edit experiment #" + str(edit_row[0]))
         edit_window_out.rowconfigure(0, weight=1)
@@ -3626,15 +3634,21 @@ def init_analysis_tab():
         """
         Reads the data of the selected experiment from its ex_#.csv file, or from the last performed experiment, and
         saves it in the data_#### variables.
+        :return: True if the program should proceed with the analysis, False if the experiment doesn't exist and
+        as such nothing should be displayed.
         """
         global data_prim, data_sec, data_i0, data_ia
         if inv_input.get() == 0:  # Read from the ex_#.csv file associated with the selected row in the table
             global current_id
             new_id = tree.item(tree.focus()).get("values")[0]  # The ID of the selected row
+            filepath = f'data/ex_{new_id}.csv'
+            if not os.path.isfile(filepath):  # If the file doesn't exist
+                delete_experiment(False)  # Prompt the user to delete the experiment
+                return False
             if new_id == current_id:  # If the same data has already been loaded, no need to do anything!
-                return
+                return True #os.path.isfile(filepath)  # But if the file doesn't exists, don't continue the analysis.
             current_id = new_id  # Update current_id for the next time load_data() is called
-            with open("data/ex_" + str(new_id) + ".csv", 'r', newline='') as f:  # Read the experiment's data
+            with open(filepath, 'r', newline='') as f:  # Read the experiment's data
                 reader = csv.reader(f)
                 new_data = [list(x) for x in zip(*list(reader))]  # Transpose to obtain 3, 4 or 5 lists corresponding
                 # to the columns.
@@ -3671,6 +3685,7 @@ def init_analysis_tab():
                 data_i0 = meas_i0
             set_labels(meas_order)  # Set the labels based on the abbreviation
             current_id = -1  # Since the data might not match any of the experiments
+        return True
 
     def show_iv(exposed):
         """
@@ -3679,7 +3694,9 @@ def init_analysis_tab():
         :param exposed: If True, show the post-exposure characteristic; if False, show the pre-exposure characteristic.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_sec, data_prim, data_i0, data_ia, label_prim
             if exposed:  # Use either data_ia or data_i0, and set the y-axis label accordingly.
                 plot_yvv(data_prim, data_sec, data_ia, label_prim, "$I_a (A)$", True)
@@ -3724,7 +3741,9 @@ def init_analysis_tab():
                 case 'Linear extrapolation':
                     return vth_lin(prim, sec, i)
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_sec, data_prim, data_i0, data_ia, label_sec, current_id
             if data_ia != []:  # Exposure
                 f_prim, f_sec, f_i0, f_ia = filter_regionless(data_prim, data_sec, data_i0, data_ia)  # See definition
@@ -3758,7 +3777,9 @@ def init_analysis_tab():
         :param m: If True, plots the max. response. If False, plots the whole response heatmap.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_sec, data_prim, data_i0, data_ia, label_prim, label_sec
             res = response(data_i0, data_ia)  # Calculate the response - returns a list of lists in the same format as
             # data_i0 and data_ia.
@@ -3779,7 +3800,9 @@ def init_analysis_tab():
         Plots the sub-threshold swing for each value of the secondary variable.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_sec, data_prim, data_i0, data_ia, label_prim, label_sec, stv_s_sts
             try:
                 try:
@@ -3818,7 +3841,9 @@ def init_analysis_tab():
 
     def show_ioffon(ratio):
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_sec, data_prim, data_i0, data_ia, label_sec, stv_s_ion
             on_th = suffix(stv_s_ion.get())
             if data_ia != []:
@@ -3860,7 +3885,9 @@ def init_analysis_tab():
         :param exposed: If True, show the post-exposure heatmap; if False, show the pre-exposure heatmap.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_sec, data_prim, data_i0, data_ia, label_prim, label_sec
             if exposed:
                 plot_heatmap(data_ia, data_sec, data_prim, label_sec, label_prim, "$I_a (A)$")
@@ -3878,7 +3905,9 @@ def init_analysis_tab():
         Plots the current of a transient experiment over time.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_prim, data_i0
             plot_yv(data_prim, data_i0, "t (sec)", "I (A)", transient=True)
         except ValueError as e:  # Most likely raised from within plot_yv()
@@ -3895,7 +3924,9 @@ def init_analysis_tab():
         Displays the off-current and on-current of a transient measurement in a messagebox.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_prim, data_i0
             if max(data_i0) / (10 ** 2.5) > min(data_i0):  # Ioff and Ion are only defined if the rise is significant!!
                 arr = np.asarray(smooth(data_i0, 10))  # Converts the list into an array and smooths it.
@@ -3935,7 +3966,9 @@ def init_analysis_tab():
         Displays the rise and fall times of a transient measurement in a messagebox.
         """
         try:
-            load_data()
+            file_exists = load_data()
+            if not file_exists:
+                return
             global data_prim, data_i0
             if max(data_i0) / (10 ** 2.5) > min(data_i0):  # The times are only defined if the rise is significant!!
                 arr = np.asarray(smooth(data_i0, 10))  # Converts the list into an array and smooths it.
@@ -3980,6 +4013,9 @@ def init_analysis_tab():
         Opens the selected experiment's data in Excel.
         """
         open_id = tree.item(tree.focus()).get("values")[0]
+        if not os.path.isfile(f'data/ex_{open_id}.csv'):  # If the file does not exist, remove it from the list
+            delete_experiment(False)
+            return
         filedir = os.path.dirname(os.path.realpath('__file__'));
         filename = os.path.join(filedir, './data/ex_' + str(open_id) + '.csv')
         xl = Dispatch('Excel.Application')
@@ -4059,7 +4095,7 @@ def init_settings_tab():
         global drain_colors, color_d1, color_d2, color_g1, color_g2, color_src
         drain_colors.clear()
         color_d1 = (0, 0, 1)
-        color_d2 = (214 / 255, 39 / 255, 40 / 255)
+        color_d2 = (1, 0, 0)
         color_g1 = (44 / 255, 160 / 255, 44 / 255)
         color_g2 = (1, 0.5, 0)
         color_src = (23 / 255, 190 / 255, 207 / 255)
@@ -4108,7 +4144,7 @@ def init_settings_tab():
     clr_src.bind('<Button-1>', lambda e: pick_color(clr_src, 'source', color_src))
 
     btn_clrtest = ttk.Button(frm_s_colors, text="Test color scheme", command=lambda: test_colors())
-    btn_clrtest.grid(row=0, column=5,padx=10, pady=5, ipadx=10, sticky='w')
+    btn_clrtest.grid(row=0, column=5, padx=10, pady=5, ipadx=10, sticky='w')
     btn_clrdefault = ttk.Button(frm_s_colors, text="Restore to default", command=lambda: default_colors())
     btn_clrdefault.grid(row=0, column=6, padx=10, pady=5, ipadx=10, sticky='w')
 
