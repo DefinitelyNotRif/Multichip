@@ -63,9 +63,9 @@ meas_type = ''  # 'char'/'exposure'/'transient'. Determines the type of the last
 vth_funcs = ['Constant', 'Linear extrapolation']
 measurement_vars.stop_ex = False  # This is explained in open_measurement_window()
 current_id = -1  # The highest ID out of the existing experiments. Is the global definition even necessary?!
-version = '1,0'
+version = '1.0'
 err_msg = ''  # Error message for when the SPA isn't connected or services aren't running
-suppress_errors = True  # If True, doesn't show errors if the SPA/Arduino aren't connected. For debugging purposes.
+suppress_errors = False  # If True, doesn't show errors if the SPA/Arduino aren't connected. For debugging purposes.
 msg_on_init = False  # Becomes True if a messagebox appears while initializing the window. In this case, let
 # hacky_no_spa_1() wait.
 meas_prim, meas_sec, meas_i0, meas_ia = [], [], [], []
@@ -267,7 +267,7 @@ def set_var_name(num, s):
         stv_name3.set("Constant variable (" + v + "): ")
     # Update the corresponding label in the "Transient" tab
     global lbls_tnames
-    lbls_tnames[num-1]["text"] = "v({}): ".format(param_list[num-1])
+    lbls_tnames[num-1]["text"] = "V({}): ".format(param_list[num-1])
 
 
 def update_table(t):
@@ -667,7 +667,7 @@ def init_channels_tab():
 
     # Choose which SMUs will be used and assign a variable to each.
     tab_channels.rowconfigure([*range(4)], weight=1)
-    tab_channels.columnconfigure([*range(4)], weight=1)
+    tab_channels.columnconfigure([0, 1, 3], weight=1)
     global smu_list
     global b1500
     if spa_connected:
@@ -713,9 +713,9 @@ def init_channels_tab():
     stv_smu3.set(temp_lst[-1][1])
     stv_smu4.set(temp_lst[-1][2])
 
-    ttk.Label(tab_channels, text="Variable name: ").grid(row=0, column=2, sticky="nse")
-    ttk.Label(tab_channels, text="Variable name: ").grid(row=1, column=2, sticky="nse")
-    ttk.Label(tab_channels, text="Variable name: ").grid(row=2, column=2, sticky="nse")
+    ttk.Label(tab_channels, text="Variable name: ").grid(row=0, column=2, sticky="nsew")
+    ttk.Label(tab_channels, text="Variable name: ").grid(row=1, column=2, sticky="nsew")
+    ttk.Label(tab_channels, text="Variable name: ").grid(row=2, column=2, sticky="nsew")
     global stv_var1, stv_var2, stv_var3
     stv_var1 = tk.StringVar(value="d")
     stv_var2 = tk.StringVar(value="jg")
@@ -1009,7 +1009,7 @@ def init_sweep_tab():
                     # Update the corresponding label in the "Transient" tab
                     global lbls_tnames
                     for i in range(3):
-                        lbls_tnames[i]["text"] = "v({}): ".format(param_list[i])
+                        lbls_tnames[i]["text"] = "V({}): ".format(param_list[i])
                     # Update the chosen value in the transient dropmenu to the drain SMU
                     # stv_name.set(param_list[0])
                     return
@@ -1065,9 +1065,9 @@ def init_sweep_tab():
             if devid == 4:
                 lbl_progress["text"] = "Initializing..."
             elif devid == 5:
-                lbl_progress["text"] = f"Measurement complete ({p_sec[0]}={strf(v)}v)."
+                lbl_progress["text"] = f"Measurement complete ({p_sec[0]}={strf(v)}V)."
             else:
-                lbl_progress["text"] = f"Measuring ({device_names[devid]}, {p_sec[0]}={strf(v)}v)..."
+                lbl_progress["text"] = f"Measuring ({device_names[devid]}, {p_sec[0]}={strf(v)}V)..."
             prb["value"] = val * 100
             if val == 1:
                 btn_ex_end["state"] = tk.NORMAL
@@ -1179,7 +1179,7 @@ def init_sweep_tab():
                 set_labels(meas_order)
                 meas_type = 'char'  # For the "Use data from last experiment" option
 
-                names = [f"v({stv_name2.get()})", f"v({stv_name1.get()})",
+                names = [f"V({stv_name2.get()})", f"V({stv_name1.get()})",
                          "I ({})".format(split('\(|\)', stv_name3.get())[1])]
                 # The parameters in the order defined in add_experiment() (see the function definition).
                 info = [date.today().strftime("%d/%m/%y"), stv_op.get(), stv_gas.get(), stv_conc.get(), stv_carr.get(),
@@ -1271,7 +1271,6 @@ def init_sweep_tab():
         try:
             board.analogRead(pinno[0])  # Just to ping it and see if it disconnected
         except Exception as e:
-            # tb = str(traceback.format_exc())
             if not suppress_errors:
                 messagebox.showerror('', 'Please reconnect the Arduino controller and reopen the program.')
                 return
@@ -1349,7 +1348,7 @@ def init_sweep_tab():
                         # voltage or the interation number.
                         sec_text = f'iteration {v}'
                     else:
-                        sec_text = f'{p_sec[0]}={strf(v)}v'
+                        sec_text = f'{p_sec[0]}={strf(v)}V'
                     if devid == 4:
                         lbl_progress["text"] = "Initializing..."
                     elif devid == 5:
@@ -1532,7 +1531,7 @@ def init_sweep_tab():
                         set_labels(meas_order)
                         global meas_type
                         meas_type = 'char'  # For the "Use data from last experiment" option
-                        names = [f"v({stv_name2.get()})", f"v({stv_name1.get()})",
+                        names = [f"V({stv_name2.get()})", f"V({stv_name1.get()})",
                                  "I ({})".format(split('\(|\)', stv_name3.get())[1])]
                         # The parameters in the order defined in add_experiment() (see the function definition).
                         temp_info = [s.get() for s in [stv_op, stv_gas, stv_conc, stv_carr, stv_atm, stv_dec,
@@ -1651,7 +1650,7 @@ def init_sweep_tab():
                     meas_order = 'C' + meas_order
                     set_labels(meas_order)
                     meas_type = 'char'  # For the "Use data from last experiment" option
-                    names = [f"v({stv_name2.get()})", f"v({stv_name1.get()})",
+                    names = [f"V({stv_name2.get()})", f"V({stv_name1.get()})",
                              "I ({})".format(split('\(|\)', stv_name3.get())[1])]
                     index = 0
                     with open("data/central.csv", newline='') as f:  # Determine the ID of the new experiment
@@ -1703,13 +1702,13 @@ def init_sweep_tab():
                         meas_type = 'transient'  # For the "Use data from last experiment" option
                         meas_prim = data_to_analyze[0]
                         meas_sec = []
-                        meas_i0 = data_to_analyze[1]  # TODO: Is this correct?
+                        meas_i0 = data_to_analyze[1]
                         meas_ia = []
                         for i in range(1, len(data_to_save[0]) + secondary_col):  # Save each experiment separately
                             sliced = [[row[0], row[i], *row[secondary_col:]] for row in data_to_save]
                             sliced = [names, *sliced]
                             params_to_file = [index, *info, meas_order, '']
-                            params_to_file[7] = ordered_devs[i-1]  # TODO: Check if these work!!
+                            params_to_file[7] = ordered_devs[i-1]
                             params_to_file[8] = ordered_names[i-1]
                             add_experiment(*params_to_file, sliced)
                             index += 1
@@ -1721,7 +1720,7 @@ def init_sweep_tab():
                         i_to_save = [[x for row in [meas[i] for meas in ex_i] for x in row] for i in
                                      range(len(ex_i[0]))]  # See explanation in run_characteristic() > finish_sweep()
                         # temp_prim = np.tile(ex_v1[0], len(ex_t))  # Convert the sweep voltages into spreadsheet format
-                        temp_prim = [x for row in ex_v1 for x in row]  # Flatten ex_v1. TODO: Is this okay?
+                        temp_prim = [x for row in ex_v1 for x in row]  # Flatten ex_v1.
                         # temp_sec = np.repeat(ex_v2, len(ex_v1[0]))
                         temp_t = [list(x) for x in zip(*ex_t)]  # Transposed so that each sub-list corresponds to a
                         # different device
@@ -1733,14 +1732,14 @@ def init_sweep_tab():
                         for i in range(len(i_to_save)):  # For each drain
                             temp_sec = temp_t[device_names.index(ordered_devs[i])]  # Take the drain's
                             # device name; Find its index (0-3) which corresponds to the index in temp_t; And then
-                            # convert it into spreadsheet format. TODO: Check if this works!
+                            # convert it into spreadsheet format.
                             temp_sec = [x.seconds + 1e-6 * x.microseconds for x in temp_sec]
                             temp_sec = np.repeat(temp_sec, len(ex_v1[0]))
                             data_to_save = [list(x) for x in
                                             zip(temp_sec, temp_prim, i_to_save[i])]  # "Transpose" the rows
                             data_to_save = [names, *data_to_save]  # Add a row for the variable names
                             params_to_file = [index, *info, meas_order, '']
-                            params_to_file[7] = ordered_devs[i]  # TODO: Check if these work!!
+                            params_to_file[7] = ordered_devs[i]
                             params_to_file[8] = ordered_names[i]
                             add_experiment(*params_to_file, data_to_save)
                             index += 1
@@ -1822,7 +1821,7 @@ def init_sweep_tab():
                     set_labels(meas_order)
                     global meas_type
                     meas_type = 'exposure'
-                    names = [f"v({stv_name2.get()})", f"v({stv_name1.get()})", stv_ex_i0.get(), stv_ex_ia.get()]
+                    names = [f"V({stv_name2.get()})", f"V({stv_name1.get()})", stv_ex_i0.get(), stv_ex_ia.get()]
                     info = [date.today().strftime("%d/%m/%y"), stv_op.get(), stv_gas.get(), stv_conc.get(), stv_carr.get(),
                             stv_atm.get(), '', '', stv_dec.get(), stv_thick.get(), stv_temp.get(), stv_hum.get()]
                     # As defined in add_experiment().
@@ -1842,10 +1841,10 @@ def init_sweep_tab():
                         data_to_save = [list(x) for x in zip(meas_sec, meas_prim,
                                                              exp_drains[i][:len(meas_ia)], i_to_save[i])]
                         # Transpose the rows. If it was aborted, meas_ia is shorter than meas_i0, so take only part
-                        # of it. TODO: Is this correct?!
+                        # of it.
                         data_to_save = [names, *data_to_save]  # Add a row for the variable names
                         params_to_file = [index, *info, meas_order, '']
-                        params_to_file[7] = ordered_devs[i]  # TODO: Check if these work!!
+                        params_to_file[7] = ordered_devs[i]
                         params_to_file[8] = ordered_names[i]
                         add_experiment(*params_to_file, data_to_save)
                         index += 1
@@ -1898,7 +1897,6 @@ def init_sweep_tab():
             try:
                 board.analogRead(pinno[0])  # Just to ping it and see if it disconnected
             except Exception as e:
-                # tb = str(traceback.format_exc())
                 if not suppress_errors:
                     messagebox.showerror('', 'Please reconnect the Arduino controller and reopen the program.')
                     return
@@ -2093,10 +2091,10 @@ def init_sweep_tab():
             ttk.Label(frm_ex_transient, text=param_list[i] + ":").grid(row=i + 2, column=0)
             ents_ex_tvars.append(ttk.Entry(frm_ex_transient, textvariable=stvs_ex_tvars[i], width=5))
             ents_ex_tvars[-1].grid(row=i + 2, column=1, sticky="ew", padx=5)
-            ttk.Label(frm_ex_transient, text="v, compliance: ").grid(row=i + 2, column=2, sticky="nsew")
+            ttk.Label(frm_ex_transient, text="V, compliance: ").grid(row=i + 2, column=2, sticky="nsew")
             ents_ex_tcomps.append(ttk.Entry(frm_ex_transient, textvariable=stvs_ex_tcomps[i], width=5))
             ents_ex_tcomps[-1].grid(row=i + 2, column=3, sticky="ew", padx=5)
-            ttk.Label(frm_ex_transient, text="v").grid(row=i + 2, column=4, sticky="w")
+            ttk.Label(frm_ex_transient, text="V").grid(row=i + 2, column=4, sticky="w")
         # stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold = tk.StringVar(value='400m'), tk.StringVar(value='11'), \
         #                                                      tk.StringVar(value='4.0'), tk.StringVar(value='.1')
         stv_ex_interval, stv_ex_n, stv_ex_tot, stv_ex_hold = tk.StringVar(), tk.StringVar(), tk.StringVar(), \
@@ -2139,10 +2137,10 @@ def init_sweep_tab():
         ttk.Label(frm_ex_sweep, text=params[1] + ": ").grid(row=1, column=0, padx=5)
         ent_ex_s_var2 = ttk.Entry(frm_ex_sweep, textvariable=stv_ex_sweepvar, width=5, state=tk.DISABLED)  # The VALUE of the var
         ent_ex_s_var2.grid(row=1, column=1, sticky="nsew", padx=5)
-        ttk.Label(frm_ex_sweep, text="v, compliance: ").grid(row=1, column=2, sticky="w")
+        ttk.Label(frm_ex_sweep, text="V, compliance: ").grid(row=1, column=2, sticky="w")
         ent_ex_s_v2comp = ttk.Entry(frm_ex_sweep, textvariable=stv_ex_s_comp, width=5, state=tk.DISABLED)
         ent_ex_s_v2comp.grid(row=1, column=3, sticky="nsew", padx=5)
-        ttk.Label(frm_ex_sweep, text="v").grid(row=1, column=4, sticky="w")
+        ttk.Label(frm_ex_sweep, text="V").grid(row=1, column=4, sticky="w")
         ttk.Label(frm_ex_sweep, text="Number of sweeps: ").grid(row=2, column=0, columnspan=2, padx=5)
         ent_ex_s_n = ttk.Entry(frm_ex_sweep, textvariable=stv_ex_s_n, width=5, state=tk.DISABLED)
         ent_ex_s_n.grid(row=2, column=2, sticky="nsw", padx=5)
@@ -2276,7 +2274,7 @@ def init_sweep_tab():
         btn_char["state"] = tk.DISABLED
         btn_run["state"] = tk.DISABLED
     global board
-    if not board:
+    if not board and not suppress_errors:
         btn_select_trans["state"] = tk.DISABLED
 
     # Parameter entry frame
@@ -2317,16 +2315,16 @@ def init_sweep_tab():
     ttk.Label(frm_primary, text="Start: ").grid(row=2, column=0, sticky="e")
     ent_start1 = ttk.Entry(frm_primary, textvariable=stv_start1, width=10)
     ent_start1.grid(row=2, column=1, sticky="ew")
-    ttk.Label(frm_primary, text="v").grid(row=2, column=2, sticky="w", padx=5)
+    ttk.Label(frm_primary, text="V").grid(row=2, column=2, sticky="w", padx=5)
     ttk.Label(frm_primary, text="Stop: ").grid(row=3, column=0, sticky="e")
     ent_stop1 = ttk.Entry(frm_primary, textvariable=stv_stop1, width=10)
     ent_stop1.grid(row=3, column=1, sticky="ew")
-    ttk.Label(frm_primary, text="v").grid(row=3, column=2, sticky="w", padx=5)
+    ttk.Label(frm_primary, text="V").grid(row=3, column=2, sticky="w", padx=5)
     ttk.Label(frm_primary, text="Step: ").grid(row=4, column=0, sticky="e")
     ent_step1 = ttk.Entry(frm_primary, state="disabled", textvariable=stv_step1, width=10)
     ent_step1.grid(row=4, column=1, sticky="ew")
     ent_step1.bind("<FocusOut>", lambda e: update_step_n(stv_step1, 'step', 1))
-    ttk.Label(frm_primary, text="v").grid(row=4, column=2, sticky="w", padx=5)
+    ttk.Label(frm_primary, text="V").grid(row=4, column=2, sticky="w", padx=5)
     ttk.Label(frm_primary, text="No. of points: ").grid(row=5, column=0, sticky="e")
     ent_n1 = ttk.Entry(frm_primary, state="disabled", textvariable=stv_n1, width=10)
     ent_n1.grid(row=5, column=1, columnspan=2, sticky="ew")
@@ -2347,15 +2345,15 @@ def init_sweep_tab():
     ttk.Label(frm_secondary, text="Start: ").grid(row=2, column=0, sticky="e")
     ent_start2 = ttk.Entry(frm_secondary, textvariable=stv_start2, width=10)
     ent_start2.grid(row=2, column=1, sticky="ew")
-    ttk.Label(frm_secondary, text="v").grid(row=2, column=2, sticky="w", padx=5)
+    ttk.Label(frm_secondary, text="V").grid(row=2, column=2, sticky="w", padx=5)
     ttk.Label(frm_secondary, text="Stop: ").grid(row=3, column=0, sticky="e")
     ent_stop2 = ttk.Entry(frm_secondary, textvariable=stv_stop2, width=10)
     ent_stop2.grid(row=3, column=1, sticky="ew")
-    ttk.Label(frm_secondary, text="v").grid(row=3, column=2, sticky="w", padx=5)
+    ttk.Label(frm_secondary, text="V").grid(row=3, column=2, sticky="w", padx=5)
     ttk.Label(frm_secondary, text="Step: ").grid(row=4, column=0, sticky="e")
     ent_step2 = ttk.Entry(frm_secondary, state="disabled", textvariable=stv_step2, width=10)
     ent_step2.grid(row=4, column=1, sticky="ew")
-    ttk.Label(frm_secondary, text="v").grid(row=4, column=2, sticky="w", padx=5)
+    ttk.Label(frm_secondary, text="V").grid(row=4, column=2, sticky="w", padx=5)
     ent_step2.bind("<FocusOut>", lambda e: update_step_n(stv_step2, 'step', 2))
     ttk.Label(frm_secondary, text="No. of points: ").grid(row=5, column=0, sticky="e")
     ent_n2 = ttk.Entry(frm_secondary, state="disabled", textvariable=stv_n2, width=10)
@@ -2374,7 +2372,7 @@ def init_sweep_tab():
     lbl_const.grid(row=0, column=0, padx=20)
     ent_const = ttk.Entry(frm_consts, textvariable=stv_const, width=10)
     ent_const.grid(row=0, column=1, sticky="ew")
-    ttk.Label(frm_consts, text="v").grid(row=0, column=2, padx=5, sticky="w")
+    ttk.Label(frm_consts, text="V").grid(row=0, column=2, padx=5, sticky="w")
     ttk.Label(frm_consts, text="Compliance: ").grid(row=0, column=3, sticky="nsw", padx=20)
     stv_const_comp = tk.StringVar()
     ent_const_comp = ttk.Entry(frm_consts, textvariable=stv_const_comp, width=10)
@@ -2877,7 +2875,7 @@ def init_time_tab():
                     # Update the corresponding label in the "Transient" tab
                     global lbls_tnames
                     for i in range(3):
-                        lbls_tnames[i]["text"] = "v({}): ".format(param_list[i])
+                        lbls_tnames[i]["text"] = "V({}): ".format(param_list[i])
 
                     # Finally, set the warning labels accordingly
                     set_warning()
@@ -2981,20 +2979,20 @@ def init_time_tab():
     frm_tvars.rowconfigure([0, 1, 2], weight=1)
     frm_tvars.columnconfigure([1, 3], weight=1)
     global lbls_tnames
-    lbls_tnames = []  # The names of the parameters (e.g. "v(d):" before its entry).
+    lbls_tnames = []  # The names of the parameters (e.g. "V(d):" before its entry).
     stvs_tvars = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
     ents_tvars = []
     stvs_tcomps = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
     ents_tcomps = []
     for i in range(3):
-        lbls_tnames.append(ttk.Label(frm_tvars, text="v({}): ".format(param_list[i])))
+        lbls_tnames.append(ttk.Label(frm_tvars, text="V({}): ".format(param_list[i])))
         lbls_tnames[-1].grid(row=i, column=0, padx=5)
         ents_tvars.append(ttk.Entry(frm_tvars, textvariable=stvs_tvars[i], width=5))
         ents_tvars[i].grid(row=i, column=1, sticky="nsew")
-        ttk.Label(frm_tvars, text="v, Compliance: ").grid(row=i, column=2, padx=5)
+        ttk.Label(frm_tvars, text="V, Compliance: ").grid(row=i, column=2, padx=5)
         ents_tcomps.append(ttk.Entry(frm_tvars, textvariable=stvs_tcomps[i], width=5))
         ents_tcomps[i].grid(row=i, column=3, sticky="nsew")
-        ttk.Label(frm_tvars, text="v").grid(row=i, column=4, padx=5)
+        ttk.Label(frm_tvars, text="V").grid(row=i, column=4, padx=5)
 
     # Transient parameters frame
     frm_params.rowconfigure([*range(7)], weight=1)
@@ -3047,7 +3045,7 @@ def init_time_tab():
     if not spa_connected and not suppress_errors:
         btn_run_time["state"] = tk.DISABLED
     global board
-    if not board:
+    if not board and not suppress_errors:
         btn_select_trans["state"] = tk.DISABLED
 
     # Save/Load frame
@@ -3221,7 +3219,7 @@ def init_import_tab():
     ttk.Label(frm_imp_info, text="Concentration: ").grid(row=0, column=6)
     ttk.Label(frm_imp_info, text="Carrier: ").grid(row=0, column=8)
     ttk.Label(frm_imp_info, text="Atmosphere: ").grid(row=0, column=10)
-    ttk.Label(frm_imp_info, text="Serial No.: ").grid(row=0, column=12)
+    ttk.Label(frm_imp_info, text="Device: ").grid(row=0, column=12)
     ttk.Label(frm_imp_info, text="Transistor: ").grid(row=1, column=0)
     ttk.Label(frm_imp_info, text="Decoration: ").grid(row=1, column=2)
     ttk.Label(frm_imp_info, text="Dec. thickness: ").grid(row=1, column=4)
@@ -3253,12 +3251,12 @@ def init_import_tab():
         header_stvs = [stv_imp_prim, stv_imp_sec, stv_imp_i0, stv_imp_ia, stv_imp_i1, stv_imp_i2, stv_imp_i3,
                        stv_imp_i4]  # To include them in locals()
         values = window.clipboard_get().split('\n')[:-1]  # The last element will always be \n, so we can clip it.
-        if len(values) < 3:  # TODO: Untrue
+        if len(values) < 3:
             tk.messagebox.showerror('', "Invalid data in clipboard!")
             return
         all_numeric = True
         header_set = False  # So that the header is set to the first row (if a header exists in the file).
-        for i in range(2):  # Clip the first two rows if they're used as headers (TODO: change)
+        for i in range(2):  # Clip the first two rows if they're used as headers
             if not numeric(values[0]):
                 temp_header = values.pop(0)
                 if var != 'time' and not header_set:
@@ -3351,8 +3349,7 @@ def init_import_tab():
                     t_names = ['Time (sec)', *[x.get() for x in [stv_imp_i1, stv_imp_i2, stv_imp_i3]]]
                     data_to_imp = [t_names, *data_to_imp]
         except NameError:
-            tb = str(traceback.format_exc())
-            messagebox.showerror('', "Invalid data. Please try pasting again. \nTraceback: " + tb)
+            messagebox.showerror('', "Invalid data. Please try pasting again.")
             return
         global notes
         params_to_file = [index, *params, imp_vars, notes]
@@ -3630,6 +3627,33 @@ def init_analysis_tab():
     # btn_t_fit = ttk.Button(tab_a_transient, text="Fit I-t curve", command=lambda: show_t_fit(), state=tk.DISABLED)
     # btn_t_fit.grid(row=0, column=3, sticky="nsew", padx=10, pady=10)
 
+    # Check if any files in the list are missing
+    missing_files = []
+    with open('data/central.csv', 'r', newline='') as f:
+        csv_reader = reader(f)
+        lines = list(csv_reader)
+    ids = [row[0] for row in lines][1:]  # Extract the IDs in central.csv
+    for i in ids:  # Find which ones don't exist
+        if not os.path.isfile(f'data/ex_{i}.csv'):
+            missing_files.append(i)
+    if missing_files:  # If the list isn't empty
+        window.update_idletasks()  # Fix a focus error
+        if messagebox.askyesno('', 'Some of the experiment files are missing. Delete them?'):
+            try:
+                with open("data/central.csv", newline='') as f:  # Get the existing data for all experiments
+                    csv_reader = reader(f)
+                    existing_data = list(csv_reader)
+                with open("data/central.csv", "w", newline='') as f:  # Rewrite everything except the rows to be deleted
+                    csv_writer = writer(f)
+                    for row in existing_data:
+                        if row[0] not in missing_files:
+                            csv_writer.writerow(row)
+                update_table(tree)  # Update the table
+            except PermissionError as e:
+                messagebox.showerror('', "Please make sure the experiment list (data/central.csv) isn't open "\
+                                         "elsewhere, and restart the program. ")
+                return
+
     def load_data():
         """
         Reads the data of the selected experiment from its ex_#.csv file, or from the last performed experiment, and
@@ -3705,17 +3729,11 @@ def init_analysis_tab():
         except ValueError as e:  # Most likely raised from within plot_yvv()
             messagebox.showerror('', "Invalid data. Make sure all the columns are the same length, and all "
                                      "the values (besides the headers) are numeric.")
-            tb = traceback.format_exc()
-            print(str(tb))
-            # logging.error(str(e) + ". Traceback: " + str(tb))
             global current_id
             current_id = -1
             return
         except (TypeError, IndexError) as e:
             messagebox.showerror('', "Invalid data. Please make sure your data is in the correct format. ")
-            tb = traceback.format_exc()
-            print(str(tb))
-            # logging.error(str(e) + ". Traceback: " + str(tb))
             current_id = -1
             return
 
@@ -3913,8 +3931,6 @@ def init_analysis_tab():
         except ValueError as e:  # Most likely raised from within plot_yv()
             messagebox.showerror('', "Invalid data. Make sure all the columns are the same length, and all "
                                      "the values (besides the headers) are numeric.")
-            # tb = traceback.format_exc()
-            # logging.error(str(e) + ". Traceback: " + str(tb))
             global current_id
             current_id = -1
             return
@@ -3954,9 +3970,6 @@ def init_analysis_tab():
         except ValueError as e:
             messagebox.showerror('', "Invalid data. Make sure all the columns are the same length, all the values "
                                      "(besides the headers) are numeric, and that the data spans multiple decades.")
-            # tb = traceback.format_exc()
-            # messagebox.showerror('', str(tb))
-            # logging.error(str(e) + ". Traceback: " + str(tb))
             global current_id
             current_id = -1
             return
@@ -3998,9 +4011,6 @@ def init_analysis_tab():
         except ValueError as e:
             messagebox.showerror('', "Invalid data. Make sure all the columns are the same length, all the values "
                                      "(besides the headers) are numeric, and that the data spans multiple decades.")
-            # tb = traceback.format_exc()
-            # messagebox.showerror('', str(tb))
-            # logging.error(str(e) + ". Traceback: " + str(tb))
             global current_id
             current_id = -1
             return
@@ -4037,7 +4047,7 @@ def init_settings_tab():
         new_prefs = [s.get() for s in [stv_s_timegroup, stv_s_vth, stv_s_const, stv_s_sts, stv_s_ion]]
         with open('data/settings/preferences.csv', 'w', newline='') as f:
             csv_writer = writer(f)
-            csv_writer.writerows([[row] for row in new_prefs])  # TODO: Edge cases; Confirmation; Check empties.
+            csv_writer.writerows([[row] for row in new_prefs])
             csv_writer.writerow([color_d1, color_d2, color_g1, color_g2, color_src])
         messagebox.showinfo('', 'Preferences saved.')
 
@@ -4271,7 +4281,7 @@ try:
         status = [x["status"] for x in services]  # Gets the status of each service as a string
         running = [x == 'running' for x in status]  # True if the service is running
         if not all(running):  # If some of the services are disabled
-            err_msg = "Some of the required services are not running. Please start them manually or restart the computer."  # TODO: Check if you can run them automatically
+            err_msg = "Some of the required services are not running. Please start them manually or restart the computer."
             th = threading.Thread(target=hacky_no_spa_1, args=(window,), daemon=True)
             th.start()
             window.title("(SPA Not Connected) Multichip")
